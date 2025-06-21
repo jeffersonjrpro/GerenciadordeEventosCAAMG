@@ -72,13 +72,25 @@ npm install
   "jsonwebtoken": "^9.0.2",
   "express-validator": "^7.0.1",
   "multer": "^1.4.5-lts.1",
-  "qrcode": "^1.5.3",
+  "qrcode": "^1.5.4",
   "nodemailer": "^6.9.7",
-  "prisma": "^5.7.1",
-  "@prisma/client": "^5.7.1",
+  "@sendgrid/mail": "^8.0.1",
+  "prisma": "^5.6.0",
+  "@prisma/client": "^5.6.0",
   "dotenv": "^16.3.1",
-  "csv-parser": "^3.0.0",
-  "csv-writer": "^1.6.0"
+  "csv-parser": "^3.2.0",
+  "csv-writer": "^1.6.0",
+  "array-flatten": "^3.0.0",
+  "moment": "^2.29.4",
+  "pg": "^8.16.2",
+  "uuid": "^9.0.1"
+}
+```
+
+**DevDependencies do Backend:**
+```json
+{
+  "nodemon": "^3.0.2"
 }
 ```
 
@@ -96,9 +108,28 @@ npm install
   "react-router-dom": "^6.20.1",
   "react-hook-form": "^7.48.2",
   "react-qr-reader": "^3.0.0-beta-1",
+  "qrcode.react": "^3.1.0",
   "axios": "^1.6.2",
   "react-hot-toast": "^2.4.1",
-  "react-icons": "^4.12.0",
+  "react-datepicker": "^4.25.0",
+  "date-fns": "^2.30.0",
+  "lucide-react": "^0.294.0",
+  "clsx": "^2.0.0",
+  "tailwind-merge": "^2.0.0",
+  "ajv": "^8.17.1",
+  "ajv-keywords": "^5.1.0",
+  "react-dev-utils": "^12.0.1",
+  "web-vitals": "^2.1.4",
+  "@testing-library/jest-dom": "^5.17.0",
+  "@testing-library/react": "^13.4.0",
+  "@testing-library/user-event": "^14.5.2",
+  "react-scripts": "5.0.1"
+}
+```
+
+**DevDependencies do Frontend:**
+```json
+{
   "tailwindcss": "^3.3.6",
   "postcss": "^8.4.32",
   "autoprefixer": "^10.4.16"
@@ -131,6 +162,10 @@ EMAIL_PORT=587
 EMAIL_USER="seu-email@gmail.com"
 EMAIL_PASS="sua-senha-de-app"
 
+# Email (SendGrid - alternativo)
+SENDGRID_API_KEY="sua-api-key-sendgrid"
+EMAIL_FROM="noreply@seusite.com"
+
 # Server
 PORT=3001
 NODE_ENV=development
@@ -138,6 +173,13 @@ NODE_ENV=development
 # Upload
 UPLOAD_PATH="./uploads"
 MAX_FILE_SIZE=5242880
+
+# CORS (opcional)
+ALLOWED_ORIGINS="http://localhost:3000,https://seusite.com"
+
+# Rate Limiting (opcional)
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
 ```
 
 **Frontend (.env):**
@@ -146,20 +188,32 @@ REACT_APP_API_URL=http://localhost:3001/api
 REACT_APP_BASE_URL=http://localhost:3000
 ```
 
-### 6. Execute as migrações do banco
+### 6. Configure o TailwindCSS (Frontend)
+```bash
+cd frontend
+npx tailwindcss init -p
+```
+
+O arquivo `tailwind.config.js` já está configurado com:
+- Cores personalizadas (primary, success, warning, danger)
+- Animações customizadas
+- Fonte Inter
+- Configurações de responsividade
+
+### 7. Execute as migrações do banco
 ```bash
 cd backend
 npx prisma generate
 npx prisma migrate dev --name init
 ```
 
-### 7. Crie o usuário administrador
+### 8. Crie o usuário administrador
 ```bash
 cd backend
 node create-admin.js
 ```
 
-### 8. Inicie o desenvolvimento
+### 9. Inicie o desenvolvimento
 
 **Opção 1: Iniciar separadamente**
 ```bash
@@ -251,6 +305,7 @@ npm run dev            # Inicia em desenvolvimento
 npm run build          # Build de produção
 npx prisma studio      # Interface visual do banco
 npx prisma migrate dev # Executa migrações
+npm run seed           # Popula banco com dados de teste
 ```
 
 ### Frontend
@@ -267,6 +322,34 @@ npm run dev            # Inicia backend e frontend
 npm run install:all    # Instala todas as dependências
 npm run build:all      # Build de produção completo
 ```
+
+## ⚙️ Configurações Específicas
+
+### Segurança
+- **Helmet.js** para headers de segurança
+- **CORS** configurado para desenvolvimento e produção
+- **Rate Limiting** (comentado para desenvolvimento)
+- **JWT** com expiração configurável
+- **Bcrypt** para hash de senhas
+
+### Upload de Arquivos
+- **Multer** para upload de imagens
+- **Validação** de tipos de arquivo
+- **Limite** de tamanho configurável
+- **Armazenamento** local em `/uploads`
+
+### Banco de Dados
+- **Prisma ORM** com PostgreSQL
+- **Migrações** automáticas
+- **Seed** para dados iniciais
+- **Studio** para visualização
+
+### Frontend
+- **TailwindCSS** com configuração personalizada
+- **React Router** com rotas protegidas
+- **Context API** para estado global
+- **Axios** com interceptors
+- **React Hook Form** com validação
 
 ## 🚨 Solução de Problemas
 
