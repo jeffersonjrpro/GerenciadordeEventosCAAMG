@@ -1,570 +1,372 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import {
-  Plus,
-  Search,
-  Filter,
-  Mail,
-  Phone,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Eye,
-  Edit,
-  Trash2,
-  ArrowLeft,
-  Download,
-  Send,
-  UserPlus
-} from 'lucide-react';
 
 const Guests = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [guests, setGuests] = useState([]);
-  const [event, setEvent] = useState(null);
-  const [pagination, setPagination] = useState({});
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedGuest, setSelectedGuest] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [presence, setPresence] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm();
-
-  const searchTerm = watch('search');
-  const statusFilter = watch('status');
+  const [newGuest, setNewGuest] = useState({ name: '', email: '', phone: '' });
+  const [importing, setImporting] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [formLink, setFormLink] = useState('');
+  const [event, setEvent] = useState(null);
+  const [customFields, setCustomFields] = useState([]);
 
   useEffect(() => {
-    fetchEventAndGuests();
+    console.log('Guests - eventId recebido:', eventId);
+    fetchEvent();
+    fetchGuests();
   }, [eventId]);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchGuests();
-    }, 500);
+    if (search || status !== 'all' || presence !== 'all') {
+      const delayDebounceFn = setTimeout(() => {
+        fetchGuests();
+      }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, statusFilter]);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [search, status, presence]);
 
-  const fetchEventAndGuests = async () => {
+  useEffect(() => {
+    setFormLink(`${window.location.origin}/event/${eventId}/formulario`);
+  }, [eventId]);
+
+  async function fetchEvent() {
     try {
-      setLoading(true);
-      const [eventResponse, guestsResponse] = await Promise.all([
-        api.get(`/events/${eventId}`),
-        api.get(`/events/${eventId}/guests`)
-      ]);
-
-      setEvent(eventResponse.data.data);
-      setGuests(guestsResponse.data.data);
-      setPagination(guestsResponse.data.pagination);
+      const response = await api.get(`/events/${eventId}`);
+      setEvent(response.data.data);
+      // Extrair campos personalizados do evento
+      if (response.data.data.customFields) {
+        setCustomFields(Object.keys(response.data.data.customFields));
+      }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      navigate('/events');
+      console.error('Erro ao buscar evento:', error);
+    }
+  }
+
+  async function fetchGuests() {
+    setLoading(true);
+    try {
+      const response = await api.get(`/events/${eventId}/guests`, {
+        params: { search, status, presence }
+      });
+      setGuests(response.data.data || []);
+    } catch (error) {
+      console.error('Erro ao buscar convidados:', error);
+      // Só mostra erro se for um erro de rede/conexão, não quando não há dados
+      if (error.response && error.response.status >= 500) {
+        alert('Erro de conexão. Tente novamente.');
+      } else if (error.response && error.response.status === 404) {
+        setGuests([]);
+      } else if (!error.response) {
+        alert('Erro de conexão. Verifique sua internet.');
+      } else {
+        setGuests([]);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const fetchGuests = async (page = 1) => {
+  async function handleAddGuest(e) {
+    e.preventDefault();
+    console.log('Tentando adicionar convidado:', newGuest);
+    console.log('EventId:', eventId);
+    
+    // Validação básica
+    if (!newGuest.name.trim()) {
+      alert('Nome é obrigatório');
+      return;
+    }
+    
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && statusFilter !== 'all' && { status: statusFilter }),
+      // Preparar dados do convidado incluindo campos personalizados
+      const guestData = {
+        name: newGuest.name,
+        email: newGuest.email || null,
+        phone: newGuest.phone || null,
+        customFields: {}
+      };
+
+      // Adicionar campos personalizados
+      customFields.forEach(field => {
+        if (newGuest[field] !== undefined && newGuest[field] !== '') {
+          guestData.customFields[field] = newGuest[field];
+        }
       });
 
-      const response = await api.get(`/events/${eventId}/guests?${params}`);
-      setGuests(response.data.data);
-      setPagination(response.data.pagination);
-    } catch (error) {
-      console.error('Erro ao carregar convidados:', error);
-    }
-  };
+      // Remover campos personalizados do objeto principal
+      const cleanGuestData = {
+        name: guestData.name,
+        email: guestData.email,
+        phone: guestData.phone,
+        customFields: guestData.customFields
+      };
 
-  const handleDeleteGuest = async () => {
-    if (!selectedGuest) return;
+      console.log('Dados limpos enviados:', cleanGuestData);
 
-    try {
-      await api.delete(`/events/${eventId}/guests/${selectedGuest.id}`);
-      setShowDeleteModal(false);
-      setSelectedGuest(null);
-      fetchGuests(pagination.page);
-    } catch (error) {
-      console.error('Erro ao deletar convidado:', error);
-    }
-  };
-
-  const handleAddGuest = async (data) => {
-    try {
-      await api.post(`/events/${eventId}/guests`, data);
+      const response = await api.post(`/events/${eventId}/guests`, cleanGuestData);
+      console.log('Resposta do servidor:', response.data);
+      setGuests([response.data.data, ...guests]);
       setShowAddModal(false);
-      reset();
-      fetchGuests();
+      setNewGuest({ name: '', email: '', phone: '' });
     } catch (error) {
-      console.error('Erro ao adicionar convidado:', error);
-    }
-  };
-
-  const handleSendInvite = async (guestId) => {
-    try {
-      await api.post(`/events/${eventId}/guests/${guestId}/send-invite`);
-      // Aqui você pode adicionar uma notificação de sucesso
-    } catch (error) {
-      console.error('Erro ao enviar convite:', error);
-    }
-  };
-
-  const handleBulkInvite = async () => {
-    try {
-      const uninvitedGuests = guests.filter(guest => !guest.inviteSent);
-      for (const guest of uninvitedGuests) {
-        await handleSendInvite(guest.id);
+      console.error('Erro completo:', error);
+      console.error('Status:', error.response?.status);
+      console.error('Data:', error.response?.data);
+      if (error.response && error.response.data && error.response.data.message) {
+        alert(`Erro ao adicionar convidado: ${error.response.data.message}`);
+      } else if (error.response && error.response.data && error.response.data.details) {
+        const errorDetails = error.response.data.details.map(d => d.msg).join(', ');
+        alert(`Erro de validação: ${errorDetails}`);
+      } else {
+        alert('Erro ao adicionar convidado. Verifique os dados e tente novamente.');
       }
-      setShowInviteModal(false);
-      fetchGuests();
-    } catch (error) {
-      console.error('Erro ao enviar convites em massa:', error);
     }
-  };
+  }
 
-  const exportGuests = async () => {
+  async function handleImportCSV(e) {
+    e.preventDefault();
+    if (!csvFile) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', csvFile);
+      const response = await api.post(`/events/${eventId}/guests/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setGuests([...response.data.data, ...guests]);
+      setCsvFile(null);
+      setShowAddModal(false);
+    } catch (error) {
+      alert('Erro ao importar CSV');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleExportCSV() {
+    setExporting(true);
     try {
       const response = await api.get(`/events/${eventId}/guests/export`, {
+        params: { status, presence },
         responseType: 'blob'
       });
-      
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `convidados-${event.name}.csv`);
+      link.setAttribute('download', `convidados-${eventId}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
-      console.error('Erro ao exportar convidados:', error);
+      alert('Erro ao exportar CSV');
+    } finally {
+      setExporting(false);
     }
-  };
+  }
 
-  const getGuestStatus = (guest) => {
-    if (guest.checkedIn) {
-      return { status: 'checked-in', label: 'Presente', color: 'text-success-700', bgColor: 'bg-success-100' };
-    } else if (guest.confirmed) {
-      return { status: 'confirmed', label: 'Confirmado', color: 'text-warning-700', bgColor: 'bg-warning-100' };
-    } else if (guest.inviteSent) {
-      return { status: 'invited', label: 'Convidado', color: 'text-primary-700', bgColor: 'bg-primary-100' };
-    } else {
-      return { status: 'pending', label: 'Pendente', color: 'text-gray-500', bgColor: 'bg-gray-100' };
+  async function handleCopyLink() {
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(formLink);
+      alert('Link copiado!');
+    } catch {
+      alert('Erro ao copiar link');
+    } finally {
+      setCopying(false);
     }
-  };
+  }
 
-  const clearFilters = () => {
-    reset();
-    fetchGuests(1);
-  };
+  async function handleConfirm(guestId) {
+    try {
+      await api.put(`/events/${eventId}/guests/${guestId}/confirm`);
+      fetchGuests();
+    } catch {
+      alert('Erro ao confirmar presença');
+    }
+  }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+  async function handleDelete(guestId) {
+    if (!window.confirm('Deseja remover este convidado?')) return;
+    try {
+      await api.delete(`/events/${eventId}/guests/${guestId}`);
+      setGuests(guests.filter(g => g.id !== guestId));
+    } catch {
+      alert('Erro ao remover convidado');
+    }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate(`/events/${eventId}`)}
-            className="btn-outline inline-flex items-center"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Convidados</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {event?.name} • {guests.length} convidados
-            </p>
+    <div className="max-w-6xl mx-auto py-8 px-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Convidados</h1>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">Adicionar</button>
+          <button onClick={() => {
+            console.log('Testando API...');
+            api.get(`/events/${eventId}/guests`).then(r => console.log('API OK:', r.data)).catch(e => console.error('API Error:', e));
+          }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Testar API</button>
+          <label className="px-4 py-2 bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+            Importar CSV
+            <input type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files[0])} />
+          </label>
+          <button onClick={handleImportCSV} disabled={!csvFile || importing} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50">{importing ? 'Importando...' : 'Enviar CSV'}</button>
+          <button onClick={handleExportCSV} disabled={exporting} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{exporting ? 'Exportando...' : 'Exportar CSV'}</button>
+          <button onClick={handleCopyLink} disabled={copying} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{copying ? 'Copiando...' : 'Copiar link formulário'}</button>
+          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">Voltar</button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Buscar por nome, e-mail ou telefone..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="px-3 py-2 border rounded w-full md:w-1/3"
+        />
+        <select
+          value={status}
+          onChange={e => setStatus(e.target.value)}
+          className="px-3 py-2 border rounded"
+        >
+          <option value="all">Todos os status</option>
+          <option value="confirmed">Confirmados</option>
+          <option value="pending">Pendentes</option>
+        </select>
+        <select
+          value={presence}
+          onChange={e => setPresence(e.target.value)}
+          className="px-3 py-2 border rounded"
+        >
+          <option value="all">Todas as presenças</option>
+          <option value="present">Presentes</option>
+          <option value="absent">Ausentes</option>
+        </select>
+      </div>
+
+      {/* Lista de convidados */}
+      <div className="bg-white shadow rounded-lg overflow-x-auto">
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">Carregando...</div>
+        ) : guests.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="text-gray-500 mb-4">Nenhum convidado encontrado.</div>
+            <button 
+              onClick={() => setShowAddModal(true)} 
+              className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+            >
+              Adicionar primeiro convidado
+            </button>
           </div>
-        </div>
-        <div className="mt-4 sm:mt-0 flex items-center space-x-2">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-outline inline-flex items-center"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Adicionar
-          </button>
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="btn-outline inline-flex items-center"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Enviar Convites
-          </button>
-          <button
-            onClick={exportGuests}
-            className="btn-outline inline-flex items-center"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </button>
-        </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Presença</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {guests.map(guest => (
+                <tr key={guest.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{guest.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{guest.email || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{guest.phone || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {guest.confirmed ? (
+                      <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs">Confirmado</span>
+                    ) : (
+                      <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs">Pendente</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {guest.checkIns && guest.checkIns.length > 0 ? (
+                      <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs">Presente</span>
+                    ) : (
+                      <span className="px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs">Ausente</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                    {!guest.confirmed && (
+                      <button onClick={() => handleConfirm(guest.id)} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200">Confirmar</button>
+                    )}
+                    <button onClick={() => handleDelete(guest.id)} className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200">Excluir</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="card">
-        <div className="card-body">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1 sm:max-w-xs">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar convidados..."
-                  className="input pl-10"
-                  {...register('search')}
-                />
-              </div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="btn-outline inline-flex items-center"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-              </button>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <button
-                onClick={clearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Limpar filtros
-              </button>
-            </div>
-          </div>
-
-          {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="form-label">Status</label>
-                  <select
-                    className="input"
-                    {...register('status')}
-                  >
-                    <option value="all">Todos</option>
-                    <option value="pending">Pendentes</option>
-                    <option value="invited">Convidados</option>
-                    <option value="confirmed">Confirmados</option>
-                    <option value="checked-in">Presentes</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Guests List */}
-      <div className="card">
-        <div className="card-body">
-          {guests.length === 0 ? (
-            <div className="text-center py-12">
-              <UserPlus className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum convidado</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Comece adicionando convidados ao seu evento.
-              </p>
-              <div className="mt-6">
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="btn-primary"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Adicionar Convidado
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Convidado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contato
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {guests.map((guest) => {
-                    const status = getGuestStatus(guest);
-                    return (
-                      <tr key={guest.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                                <span className="text-sm font-medium text-primary-600">
-                                  {guest.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {guest.name}
-                              </div>
-                              {guest.plusOne && (
-                                <div className="text-sm text-gray-500">
-                                  + {guest.plusOne}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{guest.email}</div>
-                          {guest.phone && (
-                            <div className="text-sm text-gray-500">{guest.phone}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`badge ${status.bgColor} ${status.color}`}>
-                            {status.label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center space-x-2">
-                            {!guest.inviteSent && (
-                              <button
-                                onClick={() => handleSendInvite(guest.id)}
-                                className="text-primary-600 hover:text-primary-900"
-                                title="Enviar convite"
-                              >
-                                <Send className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => navigate(`/guests/${guest.id}/edit`)}
-                              className="text-gray-400 hover:text-gray-600"
-                              title="Editar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedGuest(guest);
-                                setShowDeleteModal(true);
-                              }}
-                              className="text-gray-400 hover:text-danger-600"
-                              title="Deletar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination && pagination.pages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
-                {pagination.total} resultados
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => fetchGuests(pagination.page - 1)}
-                  disabled={pagination.page === 1}
-                  className="btn-outline px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  Anterior
-                </button>
-                <span className="px-3 py-2 text-sm text-gray-700">
-                  Página {pagination.page} de {pagination.pages}
-                </span>
-                <button
-                  onClick={() => fetchGuests(pagination.page + 1)}
-                  disabled={pagination.page === pagination.pages}
-                  className="btn-outline px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  Próxima
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Add Guest Modal */}
+      {/* Modal adicionar convidado */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 text-center">Adicionar Convidado</h3>
-              <form onSubmit={handleSubmit(handleAddGuest)} className="mt-4 space-y-4">
-                <div>
-                  <label className="form-label">Nome *</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Nome completo"
-                    {...register('name', { required: 'Nome é obrigatório' })}
-                  />
-                  {errors.name && (
-                    <p className="form-error">{errors.name.message}</p>
-                  )}
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setShowAddModal(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">&times;</button>
+            <h2 className="text-xl font-bold mb-4">Adicionar Convidado</h2>
+            <form onSubmit={handleAddGuest} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Nome *"
+                value={newGuest.name}
+                onChange={e => setNewGuest({ ...newGuest, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+                required
+              />
+              <input
+                type="email"
+                placeholder="E-mail (opcional)"
+                value={newGuest.email}
+                onChange={e => setNewGuest({ ...newGuest, email: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+              />
+              <input
+                type="text"
+                placeholder="Telefone (opcional)"
+                value={newGuest.phone}
+                onChange={e => setNewGuest({ ...newGuest, phone: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+              />
+              
+              {/* Campos personalizados */}
+              {customFields.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Campos Personalizados</h3>
+                  {customFields.map(field => (
+                    <input
+                      key={field}
+                      type="text"
+                      placeholder={field}
+                      value={newGuest[field] || ''}
+                      onChange={e => setNewGuest({ ...newGuest, [field]: e.target.value })}
+                      className="w-full px-3 py-2 border rounded mb-2"
+                    />
+                  ))}
                 </div>
-                <div>
-                  <label className="form-label">Email *</label>
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="email@exemplo.com"
-                    {...register('email', { 
-                      required: 'Email é obrigatório',
-                      pattern: {
-                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                        message: 'Email inválido'
-                      }
-                    })}
-                  />
-                  {errors.email && (
-                    <p className="form-error">{errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="form-label">Telefone</label>
-                  <input
-                    type="tel"
-                    className="input"
-                    placeholder="(11) 99999-9999"
-                    {...register('phone')}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Acompanhante</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Nome do acompanhante"
-                    {...register('plusOne')}
-                  />
-                </div>
-                <div className="flex justify-center space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="btn-outline"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                  >
-                    Adicionar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Modal */}
-      {showDeleteModal && selectedGuest && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <h3 className="text-lg font-medium text-gray-900">Confirmar exclusão</h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500">
-                  Tem certeza que deseja remover {selectedGuest.name} da lista de convidados?
-                </p>
+              )}
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Adicionar</button>
               </div>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setSelectedGuest(null);
-                  }}
-                  className="btn-outline"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDeleteGuest}
-                  className="btn-danger"
-                >
-                  Remover
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <h3 className="text-lg font-medium text-gray-900">Enviar Convites</h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500">
-                  Enviar convites para todos os convidados que ainda não receberam?
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {guests.filter(g => !g.inviteSent).length} convidados receberão o convite.
-                </p>
-              </div>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => setShowInviteModal(false)}
-                  className="btn-outline"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleBulkInvite}
-                  className="btn-primary"
-                >
-                  Enviar
-                </button>
-              </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

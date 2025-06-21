@@ -18,8 +18,8 @@ import PublicEvent from './pages/PublicEvent';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <div className="App">
           <Toaster
             position="top-right"
@@ -52,6 +52,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/event/:eventId" element={<PublicEvent />} />
             <Route path="/event/:eventId/register" element={<PublicEvent />} />
+            <Route path="/event/:eventId/formulario" element={<PublicEvent />} />
             
             {/* Rotas protegidas */}
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
@@ -70,8 +71,8 @@ function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

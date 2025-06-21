@@ -2,8 +2,8 @@ const { body, validationResult } = require('express-validator');
 const EventService = require('../services/eventService');
 
 class EventController {
-  // Validações para criação/atualização de evento
-  static eventValidation = [
+  // Validações para criação de evento (campos obrigatórios)
+  static createEventValidation = [
     body('name')
       .trim()
       .isLength({ min: 2, max: 200 })
@@ -14,12 +14,17 @@ class EventController {
       .isLength({ max: 1000 })
       .withMessage('Descrição deve ter no máximo 1000 caracteres'),
     body('date')
-      .isISO8601()
-      .withMessage('Data deve ser válida')
+      .notEmpty()
+      .withMessage('Data é obrigatória')
       .custom((value) => {
         const eventDate = new Date(value);
+        if (isNaN(eventDate.getTime())) {
+          throw new Error('Data deve ser válida');
+        }
         const now = new Date();
-        if (eventDate < now) {
+        // Permitir eventos até 1 hora no passado (para casos de fuso horário)
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (eventDate < oneHourAgo) {
           throw new Error('Data do evento não pode ser no passado');
         }
         return true;
@@ -30,34 +35,150 @@ class EventController {
       .withMessage('Local deve ter entre 2 e 200 caracteres'),
     body('maxGuests')
       .optional()
-      .isInt({ min: 1, max: 10000 })
-      .withMessage('Limite de convidados deve ser um número entre 1 e 10000')
+      .custom((value) => {
+        if (value === '' || value === null || value === undefined) {
+          return true; // Permite valores vazios
+        }
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 1 || numValue > 10000) {
+          throw new Error('Limite de convidados deve ser um número entre 1 e 10000');
+        }
+        return true;
+      })
+      .withMessage('Limite de convidados deve ser um número entre 1 e 10000'),
+    body('customFields')
+      .optional()
+      .isObject()
+      .withMessage('Campos personalizados devem ser um objeto')
+  ];
+
+  // Validações para criação/atualização de evento
+  static eventValidation = [
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 200 })
+      .withMessage('Nome do evento deve ter entre 2 e 200 caracteres'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Descrição deve ter no máximo 1000 caracteres'),
+    body('date')
+      .optional()
+      .custom((value) => {
+        if (value === undefined || value === null || value === '') {
+          return true; // Permite valores vazios para atualizações parciais
+        }
+        const eventDate = new Date(value);
+        if (isNaN(eventDate.getTime())) {
+          throw new Error('Data deve ser válida');
+        }
+        const now = new Date();
+        // Permitir eventos até 1 hora no passado (para casos de fuso horário)
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (eventDate < oneHourAgo) {
+          throw new Error('Data do evento não pode ser no passado');
+        }
+        return true;
+      }),
+    body('location')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 200 })
+      .withMessage('Local deve ter entre 2 e 200 caracteres'),
+    body('maxGuests')
+      .optional()
+      .custom((value) => {
+        if (value === '' || value === null || value === undefined) {
+          return true; // Permite valores vazios
+        }
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 1 || numValue > 10000) {
+          throw new Error('Limite de convidados deve ser um número entre 1 e 10000');
+        }
+        return true;
+      })
+      .withMessage('Limite de convidados deve ser um número entre 1 e 10000'),
+    body('customFields')
+      .optional()
+      .isObject()
+      .withMessage('Campos personalizados devem ser um objeto'),
+    body('isPublic')
+      .optional()
+      .isBoolean()
+      .withMessage('isPublic deve ser um valor booleano'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive deve ser um valor booleano')
+  ];
+
+  // Validação específica para campos personalizados
+  static customFieldsValidation = [
+    body('customFields')
+      .isObject()
+      .withMessage('Campos personalizados devem ser um objeto')
+      .custom((value) => {
+        if (!value || typeof value !== 'object') {
+          throw new Error('Campos personalizados devem ser um objeto válido');
+        }
+        
+        // Validar cada campo personalizado
+        for (const [fieldName, fieldConfig] of Object.entries(value)) {
+          if (typeof fieldName !== 'string' || fieldName.trim().length === 0) {
+            throw new Error('Nome do campo personalizado deve ser uma string válida');
+          }
+          
+          if (typeof fieldConfig !== 'object' || !fieldConfig.type) {
+            throw new Error(`Configuração inválida para o campo "${fieldName}"`);
+          }
+          
+          const validTypes = ['text', 'email', 'number', 'tel', 'date'];
+          if (!validTypes.includes(fieldConfig.type)) {
+            throw new Error(`Tipo inválido para o campo "${fieldName}". Tipos válidos: ${validTypes.join(', ')}`);
+          }
+        }
+        
+        return true;
+      })
   ];
 
   // Criar evento
   static async createEvent(req, res) {
     try {
-      // Verificar erros de validação
+      // Verificar erros de validação usando a validação específica de criação
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('Erros de validação:', errors.array());
         return res.status(400).json({
           error: 'Dados inválidos',
-          details: errors.array()
+          details: errors.array(),
+          receivedData: req.body
         });
       }
 
       const eventData = req.body;
+      console.log('Dados recebidos:', eventData);
+      
+      // Adicionar caminho da imagem se foi enviada
+      if (req.file) {
+        eventData.imageUrl = `/uploads/events/${req.file.filename}`;
+      }
+
       const event = await EventService.createEvent(req.user.id, eventData);
 
       res.status(201).json({
         message: 'Evento criado com sucesso',
+        id: event.id,
         data: event
       });
     } catch (error) {
       console.error('Erro ao criar evento:', error);
       
       res.status(500).json({
-        error: 'Erro interno do servidor'
+        error: 'Erro interno do servidor',
+        message: error.message
       });
     }
   }
@@ -139,9 +260,13 @@ class EventController {
   // Atualizar evento
   static async updateEvent(req, res) {
     try {
+      console.log('UpdateEvent - Dados recebidos:', req.body);
+      console.log('UpdateEvent - Parâmetros:', req.params);
+
       // Verificar erros de validação
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('UpdateEvent - Erros de validação:', errors.array());
         return res.status(400).json({
           error: 'Dados inválidos',
           details: errors.array()
@@ -150,6 +275,11 @@ class EventController {
 
       const { eventId } = req.params;
       const updateData = req.body;
+      
+      // Adicionar caminho da imagem se foi enviada
+      if (req.file) {
+        updateData.imageUrl = `/uploads/events/${req.file.filename}`;
+      }
 
       const event = await EventService.updateEvent(eventId, req.user.id, updateData);
 
@@ -237,26 +367,33 @@ class EventController {
     }
   }
 
-  // Buscar evento público (para RSVP)
+  // Buscar evento público
   static async getPublicEvent(req, res) {
     try {
       const { eventId } = req.params;
-      const event = await EventService.getPublicEvent(eventId);
+      console.log('🔍 getPublicEvent - eventId:', eventId);
 
-      res.json({
-        data: event
-      });
-    } catch (error) {
-      console.error('Erro ao buscar evento público:', error);
-      
-      if (error.message === 'Evento não encontrado ou inativo') {
+      const event = await EventService.getPublicEvent(eventId);
+      console.log('✅ getPublicEvent - evento retornado:', JSON.stringify(event, null, 2));
+
+      if (!event) {
+        console.log('❌ getPublicEvent - evento não encontrado');
         return res.status(404).json({
-          error: error.message
+          success: false,
+          message: 'Evento não encontrado'
         });
       }
 
+      console.log('✅ getPublicEvent - enviando resposta de sucesso');
+      res.json({
+        success: true,
+        data: event
+      });
+    } catch (error) {
+      console.error('❌ Erro ao buscar evento público:', error);
       res.status(500).json({
-        error: 'Erro interno do servidor'
+        success: false,
+        message: 'Erro interno do servidor'
       });
     }
   }
@@ -272,6 +409,84 @@ class EventController {
       });
     } catch (error) {
       console.error('Erro ao verificar se evento está cheio:', error);
+      
+      if (error.message === 'Evento não encontrado') {
+        return res.status(404).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Pausar inscrições
+  static async pauseRegistration(req, res) {
+    try {
+      const { eventId } = req.params;
+      const { pauseUntil } = req.body;
+
+      const event = await EventService.pauseRegistration(eventId, req.user.id, pauseUntil);
+
+      res.json({
+        message: 'Inscrições pausadas com sucesso',
+        data: event
+      });
+    } catch (error) {
+      console.error('Erro ao pausar inscrições:', error);
+      
+      if (error.message === 'Evento não encontrado') {
+        return res.status(404).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Retomar inscrições
+  static async resumeRegistration(req, res) {
+    try {
+      const { eventId } = req.params;
+
+      const event = await EventService.resumeRegistration(eventId, req.user.id);
+
+      res.json({
+        message: 'Inscrições retomadas com sucesso',
+        data: event
+      });
+    } catch (error) {
+      console.error('Erro ao retomar inscrições:', error);
+      
+      if (error.message === 'Evento não encontrado') {
+        return res.status(404).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Verificar status das inscrições
+  static async getRegistrationStatus(req, res) {
+    try {
+      const { eventId } = req.params;
+
+      const isPaused = await EventService.isRegistrationPaused(eventId);
+
+      res.json({
+        data: { isPaused }
+      });
+    } catch (error) {
+      console.error('Erro ao verificar status das inscrições:', error);
       
       if (error.message === 'Evento não encontrado') {
         return res.status(404).json({

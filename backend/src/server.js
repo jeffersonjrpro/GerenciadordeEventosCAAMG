@@ -7,7 +7,6 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const eventRoutes = require('./routes/events');
-const guestRoutes = require('./routes/guests');
 const checkInRoutes = require('./routes/checkin');
 const publicRoutes = require('./routes/public');
 
@@ -17,13 +16,13 @@ const PORT = process.env.PORT || 3001;
 // Middleware de segurança
 app.use(helmet());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // limite de 100 requests por IP
-  message: 'Muitas requisições deste IP, tente novamente mais tarde.'
-});
-app.use('/api/', limiter);
+// Rate limiting - comentado temporariamente para desenvolvimento
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutos
+//   max: 100, // limite de 100 requests por IP
+//   message: 'Muitas requisições deste IP, tente novamente mais tarde.'
+// });
+// app.use('/api/', limiter);
 
 // CORS
 app.use(cors({
@@ -47,7 +46,6 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/guests', guestRoutes);
 app.use('/api/checkin', checkInRoutes);
 app.use('/api/public', publicRoutes);
 

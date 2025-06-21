@@ -29,7 +29,7 @@ class GuestService {
       }
     }
 
-    const { name, email, phone } = guestData;
+    const { name, email, phone, customFields } = guestData;
 
     // Gerar QR Code único
     const qrCodeData = `${eventId}-${uuidv4()}`;
@@ -39,6 +39,7 @@ class GuestService {
         name,
         email,
         phone,
+        customFields: customFields || {},
         qrCode: qrCodeData,
         eventId
       },
@@ -49,6 +50,7 @@ class GuestService {
             name: true,
             date: true,
             location: true,
+            customFields: true,
             user: {
               select: {
                 name: true

@@ -25,6 +25,8 @@ const PublicEvent = () => {
   const [showRegistration, setShowRegistration] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [guest, setGuest] = useState(null);
 
   const {
     register,
@@ -40,7 +42,7 @@ const PublicEvent = () => {
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/events/${eventId}/public`);
+      const response = await api.get(`/public/events/${eventId}`);
       setEvent(response.data.data);
     } catch (error) {
       console.error('Erro ao carregar evento:', error);
@@ -53,7 +55,7 @@ const PublicEvent = () => {
   const handleRegistration = async (data) => {
     try {
       setLoading(true);
-      await api.post(`/events/${eventId}/register`, data);
+      await api.post(`/public/events/${eventId}/register`, data);
       setRegistrationSuccess(true);
       reset();
     } catch (error) {
@@ -61,6 +63,23 @@ const PublicEvent = () => {
       setError(error.response?.data?.message || 'Erro ao registrar presença');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onSubmit = async (data) => {
+    try {
+      setSubmitting(true);
+      setError(null);
+      
+      const response = await api.post(`/public/events/${eventId}/guests/public`, data);
+      setGuest(response.data.data);
+      setRegistrationSuccess(true);
+      reset();
+    } catch (error) {
+      console.error('Erro ao inscrever:', error);
+      setError(error.response?.data?.message || 'Erro ao realizar inscrição. Tente novamente.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -132,6 +151,103 @@ const PublicEvent = () => {
   }
 
   const status = getEventStatus(event);
+
+  if (registrationSuccess && guest) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="text-center">
+              <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-6" />
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                Inscrição Confirmada!
+              </h1>
+              <p className="text-lg text-gray-600 mb-8">
+                Sua inscrição foi realizada com sucesso. Guarde seu QR Code para o check-in no evento.
+              </p>
+            </div>
+
+            {/* Informações do Evento */}
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                {event.name}
+              </h2>
+              <div className="space-y-3">
+                <div className="flex items-center text-gray-600">
+                  <Calendar className="h-5 w-5 mr-3" />
+                  <span>
+                    {new Date(event.date).toLocaleDateString('pt-BR', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+                {event.location && (
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="h-5 w-5 mr-3" />
+                    <span>{event.location}</span>
+                  </div>
+                )}
+                {event.time && (
+                  <div className="flex items-center text-gray-600">
+                    <Clock className="h-5 w-5 mr-3" />
+                    <span>{event.time}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Informações do Convidado */}
+            <div className="bg-blue-50 rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Suas Informações
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center text-gray-700">
+                  <User className="h-5 w-5 mr-3" />
+                  <span className="font-medium">{guest.name}</span>
+                </div>
+                {guest.email && (
+                  <div className="flex items-center text-gray-700">
+                    <Mail className="h-5 w-5 mr-3" />
+                    <span>{guest.email}</span>
+                  </div>
+                )}
+                {guest.phone && (
+                  <div className="flex items-center text-gray-700">
+                    <Phone className="h-5 w-5 mr-3" />
+                    <span>{guest.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Seu QR Code
+              </h3>
+              <div className="flex justify-center mb-4">
+                <img
+                  src={`/api/qr-code/${guest.qrCode}`}
+                  alt="QR Code"
+                  className="border-4 border-gray-200 rounded-lg"
+                />
+              </div>
+              <p className="text-sm text-gray-600 mb-6">
+                Código: {guest.qrCode}
+              </p>
+              <p className="text-sm text-gray-500">
+                Apresente este QR Code no momento do check-in do evento.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -228,7 +344,7 @@ const PublicEvent = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Confirmar Presença
                 </h3>
-                <form onSubmit={handleSubmit(handleRegistration)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="name" className="form-label">
@@ -332,11 +448,11 @@ const PublicEvent = () => {
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={submitting}
                       className="btn-primary inline-flex items-center"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      {loading ? 'Confirmando...' : 'Confirmar Presença'}
+                      {submitting ? 'Enviando...' : 'Confirmar Inscrição'}
                     </button>
                   </div>
                 </form>

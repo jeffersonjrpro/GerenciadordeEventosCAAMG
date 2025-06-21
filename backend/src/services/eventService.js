@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 class EventService {
   // Criar novo evento
   static async createEvent(userId, eventData) {
-    const { name, description, date, location, maxGuests } = eventData;
+    const { name, description, date, location, maxGuests, customFields } = eventData;
 
     const event = await prisma.event.create({
       data: {
@@ -14,6 +14,7 @@ class EventService {
         date: new Date(date),
         location,
         maxGuests: maxGuests ? parseInt(maxGuests) : null,
+        customFields: customFields || {},
         userId
       },
       include: {
@@ -199,6 +200,11 @@ class EventService {
 
   // Atualizar evento
   static async updateEvent(eventId, userId, updateData) {
+    console.log('EventService.updateEvent - Iniciando atualização');
+    console.log('EventService.updateEvent - eventId:', eventId);
+    console.log('EventService.updateEvent - userId:', userId);
+    console.log('EventService.updateEvent - updateData:', updateData);
+    
     // Verificar se o evento existe e pertence ao usuário
     const existingEvent = await prisma.event.findFirst({
       where: {
@@ -208,10 +214,17 @@ class EventService {
     });
 
     if (!existingEvent) {
+      console.log('EventService.updateEvent - Evento não encontrado');
       throw new Error('Evento não encontrado');
     }
 
-    const { name, description, date, location, maxGuests, isActive } = updateData;
+    console.log('EventService.updateEvent - Evento encontrado:', existingEvent.id);
+
+    const { name, description, date, location, maxGuests, isActive, isPublic, customFields } = updateData;
+
+    console.log('EventService.updateEvent - Dados para atualização:', {
+      name, description, date, location, maxGuests, isActive, isPublic, customFields
+    });
 
     const event = await prisma.event.update({
       where: { id: eventId },
@@ -221,7 +234,9 @@ class EventService {
         ...(date && { date: new Date(date) }),
         ...(location && { location }),
         ...(maxGuests !== undefined && { maxGuests: maxGuests ? parseInt(maxGuests) : null }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(isPublic !== undefined && { isPublic }),
+        ...(customFields !== undefined && { customFields })
       },
       include: {
         user: {
@@ -240,6 +255,7 @@ class EventService {
       }
     });
 
+    console.log('EventService.updateEvent - Evento atualizado com sucesso');
     return event;
   }
 
@@ -335,7 +351,8 @@ class EventService {
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
-        isActive: true
+        isActive: true,
+        isPublic: true
       },
       select: {
         id: true,
@@ -344,6 +361,9 @@ class EventService {
         date: true,
         location: true,
         maxGuests: true,
+        isPublic: true,
+        isActive: true,
+        customFields: true,
         user: {
           select: {
             name: true
@@ -358,7 +378,7 @@ class EventService {
     });
 
     if (!event) {
-      throw new Error('Evento não encontrado ou inativo');
+      throw new Error('Evento não encontrado ou não está disponível publicamente');
     }
 
     return event;
@@ -386,6 +406,108 @@ class EventService {
     }
 
     return event._count.guests >= event.maxGuests;
+  }
+
+  // Pausar inscrições manualmente
+  static async pauseRegistration(eventId, userId, pauseUntil = null) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    const updateData = {
+      registrationPaused: true
+    };
+
+    if (pauseUntil) {
+      updateData.registrationPauseUntil = new Date(pauseUntil);
+    }
+
+    return await prisma.event.update({
+      where: { id: eventId },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        _count: {
+          select: {
+            guests: true,
+            checkIns: true
+          }
+        }
+      }
+    });
+  }
+
+  // Retomar inscrições
+  static async resumeRegistration(eventId, userId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    return await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        registrationPaused: false,
+        registrationPauseUntil: null
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        _count: {
+          select: {
+            guests: true,
+            checkIns: true
+          }
+        }
+      }
+    });
+  }
+
+  // Verificar se inscrições estão pausadas
+  static async isRegistrationPaused(eventId) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    // Se pausa manual está ativa
+    if (event.registrationPaused) {
+      return true;
+    }
+
+    // Se há data de pausa e ainda não expirou
+    if (event.registrationPauseUntil && new Date() < event.registrationPauseUntil) {
+      return true;
+    }
+
+    return false;
   }
 }
 

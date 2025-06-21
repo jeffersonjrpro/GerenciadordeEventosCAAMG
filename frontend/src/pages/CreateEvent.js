@@ -8,6 +8,7 @@ const CreateEvent = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const {
     register,
@@ -23,16 +24,29 @@ const CreateEvent = () => {
     try {
       const formData = new FormData();
       
-      // Adiciona os campos do formulário
+      // Processar e adicionar apenas campos válidos
       Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== null) {
-          if (key === 'isActive') {
+        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+          if (key === 'isActive' || key === 'requiresConfirmation' || key === 'allowGuests') {
             formData.append(key, data[key] ? 'true' : 'false');
-          } else {
+          } else if (key === 'maxGuests') {
+            // Só adiciona se for um número válido
+            const numValue = parseInt(data[key]);
+            if (!isNaN(numValue) && numValue > 0) {
+              formData.append(key, numValue.toString());
+            }
+          } else if (key !== 'image') { // Não adiciona o campo image aqui
             formData.append(key, data[key]);
           }
         }
       });
+
+      // Adiciona a imagem se foi selecionada
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+
+      console.log('Enviando dados:', Object.fromEntries(formData));
 
       const response = await api.post('/events', formData, {
         headers: {
@@ -40,9 +54,20 @@ const CreateEvent = () => {
         },
       });
 
-      navigate(`/events/${response.data.data.id}`);
+      console.log('Resposta do servidor:', response.data);
+      navigate(`/events/${response.data.id}`);
     } catch (error) {
       console.error('Erro ao criar evento:', error);
+      if (error.response && error.response.data) {
+        console.error('Detalhes do erro:', error.response.data);
+        if (error.response.data.details) {
+          alert('Erro de validação: ' + error.response.data.details.map(d => d.msg).join(', '));
+        } else {
+          alert('Erro ao criar evento: ' + (error.response.data.message || error.response.data.error || error.message));
+        }
+      } else {
+        alert('Erro ao criar evento: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -51,6 +76,7 @@ const CreateEvent = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -182,24 +208,24 @@ const CreateEvent = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="capacity" className="form-label">
+                    <label htmlFor="maxGuests" className="form-label">
                       Capacidade
                     </label>
                     <input
-                      id="capacity"
+                      id="maxGuests"
                       type="number"
                       min="1"
                       className="input"
                       placeholder="Ex: 100"
-                      {...register('capacity', {
+                      {...register('maxGuests', {
                         min: {
                           value: 1,
                           message: 'Capacidade deve ser maior que 0',
                         },
                       })}
                     />
-                    {errors.capacity && (
-                      <p className="form-error">{errors.capacity.message}</p>
+                    {errors.maxGuests && (
+                      <p className="form-error">{errors.maxGuests.message}</p>
                     )}
                   </div>
 

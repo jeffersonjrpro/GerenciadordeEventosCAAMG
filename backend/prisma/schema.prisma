@@ -32,7 +32,12 @@ model Event {
   date        DateTime
   location    String
   maxGuests   Int?
+  imageUrl    String?
   isActive    Boolean  @default(true)
+  isPublic    Boolean  @default(false)
+  registrationPaused Boolean @default(false)  // Pausar inscrições manualmente
+  registrationPauseUntil DateTime?  // Pausar inscrições até uma data específica
+  customFields Json?   // Campos personalizados do evento
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -46,14 +51,16 @@ model Event {
 }
 
 model Guest {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  confirmed Boolean  @default(false)
-  qrCode    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  confirmed   Boolean   @default(false)
+  confirmedAt DateTime?
+  qrCode      String    @unique
+  customFields Json?    // Campos personalizados do convidado
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relacionamentos
   eventId   String

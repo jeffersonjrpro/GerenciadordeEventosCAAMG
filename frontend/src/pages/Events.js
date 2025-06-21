@@ -39,11 +39,13 @@ const Events = () => {
   }, []);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchEvents();
-    }, 500);
+    if (searchTerm || statusFilter) {
+      const delayDebounceFn = setTimeout(() => {
+        fetchEvents();
+      }, 500);
 
-    return () => clearTimeout(delayDebounceFn);
+      return () => clearTimeout(delayDebounceFn);
+    }
   }, [searchTerm, statusFilter]);
 
   const fetchEvents = async (page = 1) => {
