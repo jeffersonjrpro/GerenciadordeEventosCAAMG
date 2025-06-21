@@ -6,10 +6,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "migrate": "prisma migrate dev",
+    "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "studio": "prisma studio",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "build": "prisma generate",
+    "deploy": "npm run build && npm start"
   },
   "dependencies": {
     "@prisma/client": "^5.6.0",

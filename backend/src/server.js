@@ -16,21 +16,23 @@ const PORT = process.env.PORT || 3001;
 // Middleware de segurança
 app.use(helmet());
 
-// Rate limiting - comentado temporariamente para desenvolvimento
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutos
-//   max: 100, // limite de 100 requests por IP
-//   message: 'Muitas requisições deste IP, tente novamente mais tarde.'
-// });
-// app.use('/api/', limiter);
-
 // CORS
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://seusite.com'] 
+    ? process.env.ALLOWED_ORIGINS?.split(',') || ['https://seusite.com'] 
     : ['http://localhost:3000'],
   credentials: true
 }));
+
+// Rate limiting - habilitado em produção
+if (process.env.NODE_ENV === 'production') {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limite de 100 requests por IP
+    message: 'Muitas requisições deste IP, tente novamente mais tarde.'
+  });
+  app.use('/api/', limiter);
+}
 
 // Middleware para parsing
 app.use(express.json({ limit: '10mb' }));

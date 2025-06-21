@@ -377,6 +377,31 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
+## 🚀 Deploy em Produção
+
+Para fazer o deploy em um servidor de produção, consulte o guia completo:
+
+**[📖 Guia de Deploy](DEPLOY.md)**
+
+### Resumo rápido:
+1. **Configurar servidor** (Node.js, PostgreSQL, PM2)
+2. **Configurar variáveis de ambiente** para produção
+3. **Executar migrações** do banco
+4. **Build do frontend** e configuração do Nginx
+5. **Configurar SSL/HTTPS** com Let's Encrypt
+6. **Configurar backup** automático
+
+### Scripts de produção:
+```bash
+# Backend
+npm run build        # Gera Prisma Client
+npm run deploy       # Build + Start
+pm2 start ecosystem.config.js  # Com PM2
+
+# Frontend
+npm run build        # Build de produção
+```
+
 ## 📊 Funcionalidades Futuras
 
 - [ ] Integração com WhatsApp Business API
