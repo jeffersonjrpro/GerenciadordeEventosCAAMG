@@ -15,7 +15,7 @@ class CheckInService {
             location: true,
             isActive: true,
             userId: true
-          }
+          } 
         },
         checkIns: true
       }

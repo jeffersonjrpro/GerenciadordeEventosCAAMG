@@ -25,6 +25,7 @@ async function checkEventStatus() {
       return;
     }
     
+    
     console.log('✅ Evento encontrado:');
     console.log('  - Nome:', event.name);
     console.log('  - isActive:', event.isActive);
