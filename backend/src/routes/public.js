@@ -3,9 +3,13 @@ const router = express.Router();
 const EventController = require('../controllers/eventController');
 const GuestController = require('../controllers/guestController');
 
-// Rotas públicas
-router.get('/events/:eventId', EventController.getPublicEvent);
+// Rotas públicas - rotas mais específicas primeiro
+router.get('/events/:eventId/preview', EventController.getEventPreview);
+router.get('/events/:eventId/form-config/preview', EventController.getPublicFormConfigForPreview);
+router.get('/events/:eventId/public-page-config/preview', EventController.getPublicPageConfigForPreview);
+router.get('/events/:eventId/form-config', EventController.getPublicFormConfig);
 router.get('/events/:eventId/full', EventController.isEventFull);
+router.get('/events/:eventId', EventController.getPublicEvent);
 
 // Inscrição pública
 router.post('/events/:eventId/guests/public', GuestController.addPublicGuest);

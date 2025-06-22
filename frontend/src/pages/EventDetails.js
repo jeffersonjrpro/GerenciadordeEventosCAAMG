@@ -24,7 +24,9 @@ import {
   Users2,
   UserCheck,
   UserX,
-  CalendarDays
+  CalendarDays,
+  Type,
+  Palette
 } from 'lucide-react';
 
 const EventDetails = () => {
@@ -548,6 +550,22 @@ const EventDetails = () => {
               >
                 <QrCode className="h-4 w-4 mr-2" />
                 Check-in
+              </Link>
+              
+              <Link
+                to={`/events/${eventId}/form-builder`}
+                className="btn-outline w-full inline-flex items-center justify-center"
+              >
+                <Type className="h-4 w-4 mr-2" />
+                Construtor de Formulário
+              </Link>
+              
+              <Link
+                to={`/events/${eventId}/page-editor`}
+                className="btn-outline w-full inline-flex items-center justify-center"
+              >
+                <Palette className="h-4 w-4 mr-2" />
+                Editor da Página
               </Link>
               
               <button

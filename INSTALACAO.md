@@ -19,6 +19,10 @@ cd gerenciador-eventos-qr
 npm run install:all
 ```
 
+Este comando irá instalar todas as dependências necessárias para o backend e frontend. Para o frontend, isso inclui os pacotes:
+- `react-quill` para o editor de texto rico.
+- `@tailwindcss/typography` para a estilização do conteúdo gerado.
+
 ### 3. Configure o banco de dados PostgreSQL
 
 Crie um banco de dados PostgreSQL:
@@ -48,6 +52,18 @@ NODE_ENV=development
 
 # Frontend URL
 FRONTEND_URL="http://localhost:3000"
+```
+
+Crie também um arquivo `.env` na pasta `frontend/`. Ele é usado para definir a URL da sua API, mas não requer mais chaves de API para o editor de texto. Você pode copiar o exemplo:
+```bash
+# Navegue para a pasta do frontend se não estiver nela
+cd frontend
+cp .env.example .env
+```
+O conteúdo principal do `frontend/.env` deve ser:
+```env
+# URL da API Backend
+REACT_APP_API_URL=http://localhost:3001/api
 ```
 
 ### 5. Execute as migrações do banco

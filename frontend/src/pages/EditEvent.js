@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import api from '../services/api';
 import { Calendar, MapPin, Clock, FileText, Save, ArrowLeft } from 'lucide-react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const EditEvent = () => {
   const { eventId } = useParams();
@@ -17,7 +19,8 @@ const EditEvent = () => {
     handleSubmit,
     formState: { errors },
     watch,
-    reset
+    reset,
+    control
   } = useForm();
 
   const isActive = watch('isActive');
@@ -42,11 +45,9 @@ const EditEvent = () => {
         description: eventData.description || '',
         date: formattedDate,
         location: eventData.location,
-        capacity: eventData.capacity || '',
-        category: eventData.category || '',
+        capacity: eventData.maxGuests || '',
         isActive: eventData.isActive,
-        requiresConfirmation: eventData.requiresConfirmation,
-        allowGuests: eventData.allowGuests
+        isPublic: eventData.isPublic
       });
 
       if (eventData.imageUrl) {
@@ -68,13 +69,25 @@ const EditEvent = () => {
       // Adiciona os campos do formulário
       Object.keys(data).forEach(key => {
         if (data[key] !== undefined && data[key] !== null) {
-          if (key === 'isActive' || key === 'requiresConfirmation' || key === 'allowGuests') {
+          if (key === 'isActive' || key === 'isPublic') {
             formData.append(key, data[key] ? 'true' : 'false');
-          } else {
+          } else if (key === 'capacity') {
+            // Mapeia capacity para maxGuests
+            formData.append('maxGuests', data[key]);
+          } else if (key === 'description') {
+            // Evita que descrições vazias (<p><br></p>) sejam salvas como nulas
+            formData.append('description', data[key] === '<p><br></p>' ? '' : data[key]);
+          } else if (key !== 'image') { // Não adiciona o campo image aqui
             formData.append(key, data[key]);
           }
         }
       });
+
+      // Adiciona o arquivo de imagem se foi selecionado
+      const imageFile = data.image?.[0];
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
 
       await api.put(`/events/${eventId}`, formData, {
         headers: {
@@ -82,9 +95,14 @@ const EditEvent = () => {
         },
       });
 
-      navigate(`/events/${eventId}`);
+      // Recarregar os dados do evento para mostrar a nova imagem
+      await fetchEventDetails();
+      
+      // Mostrar mensagem de sucesso
+      alert('Evento atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar evento:', error);
+      alert('Erro ao atualizar evento. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -100,6 +118,23 @@ const EditEvent = () => {
       reader.readAsDataURL(file);
     }
   };
+
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+      ['link', 'image'],
+      ['clean']
+    ],
+  };
+
+  const quillFormats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'link', 'image'
+  ];
 
   if (loading) {
     return (
@@ -185,17 +220,21 @@ const EditEvent = () => {
                   <label htmlFor="description" className="form-label">
                     Descrição
                   </label>
-                  <textarea
-                    id="description"
-                    rows={4}
-                    className="input"
-                    placeholder="Descreva seu evento..."
-                    {...register('description', {
-                      maxLength: {
-                        value: 1000,
-                        message: 'Descrição deve ter no máximo 1000 caracteres',
-                      },
-                    })}
+                  <Controller
+                    name="description"
+                    control={control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <ReactQuill
+                        theme="snow"
+                        value={field.value}
+                        onChange={field.onChange}
+                        modules={quillModules}
+                        formats={quillFormats}
+                        placeholder="Descreva seu evento de forma detalhada..."
+                        className="bg-white"
+                      />
+                    )}
                   />
                   {errors.description && (
                     <p className="form-error">{errors.description.message}</p>
@@ -271,26 +310,6 @@ const EditEvent = () => {
                       <p className="form-error">{errors.capacity.message}</p>
                     )}
                   </div>
-
-                  <div>
-                    <label htmlFor="category" className="form-label">
-                      Categoria
-                    </label>
-                    <select
-                      id="category"
-                      className="input"
-                      {...register('category')}
-                    >
-                      <option value="">Selecione uma categoria</option>
-                      <option value="business">Negócios</option>
-                      <option value="technology">Tecnologia</option>
-                      <option value="education">Educação</option>
-                      <option value="entertainment">Entretenimento</option>
-                      <option value="health">Saúde</option>
-                      <option value="sports">Esportes</option>
-                      <option value="other">Outros</option>
-                    </select>
-                  </div>
                 </div>
               </div>
             </div>
@@ -322,37 +341,18 @@ const EditEvent = () => {
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <label htmlFor="requiresConfirmation" className="form-label">
-                      Requer Confirmação
+                    <label htmlFor="isPublic" className="form-label">
+                      Evento Público
                     </label>
                     <p className="text-sm text-gray-500">
-                      Convidados precisam confirmar presença
+                      Eventos públicos podem ser acessados por qualquer pessoa
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       className="sr-only peer"
-                      {...register('requiresConfirmation')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="allowGuests" className="form-label">
-                      Permitir Convidados
-                    </label>
-                    <p className="text-sm text-gray-500">
-                      Convidados podem adicionar outros convidados
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      {...register('allowGuests')}
+                      {...register('isPublic')}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                   </label>

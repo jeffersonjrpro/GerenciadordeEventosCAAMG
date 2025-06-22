@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
@@ -8,29 +8,25 @@ import {
   CheckCircle,
   XCircle,
   ArrowLeft,
-  Users,
-  Clock,
-  AlertCircle
+  AlertCircle,
+  Ticket
 } from 'lucide-react';
+import { QrReader } from 'react-qr-reader';
 
 const CheckIn = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checkInResult, setCheckInResult] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [error, setError] = useState(null);
+  const [manualCode, setManualCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
-    return () => {
-      stopCamera();
-    };
   }, [eventId]);
 
   const fetchEventDetails = async () => {
@@ -46,80 +42,23 @@ const CheckIn = () => {
     }
   };
 
-  const startCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      setIsScanning(true);
-      setError(null);
-    } catch (err) {
-      console.error('Erro ao acessar câmera:', err);
-      setError('Não foi possível acessar a câmera. Verifique as permissões.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setIsScanning(false);
-  };
-
-  const scanQRCode = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.height = video.videoHeight;
-      canvas.width = video.videoWidth;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Aqui você pode integrar com uma biblioteca de QR Code como jsQR
-      // Por enquanto, vamos simular a detecção
-      detectQRCode(imageData);
-    }
-
-    if (isScanning) {
-      requestAnimationFrame(scanQRCode);
-    }
-  };
-
-  const detectQRCode = async (imageData) => {
-    // Esta é uma implementação simulada
-    // Em produção, você deve usar uma biblioteca como jsQR
-    try {
-      // Simular detecção de QR Code
-      const qrData = "guest_123"; // Dados simulados do QR Code
-      
-      if (qrData) {
-        await handleCheckIn(qrData);
-      }
-    } catch (error) {
-      console.error('Erro ao processar QR Code:', error);
+  const handleScanResult = async (result) => {
+    if (result && !isSubmitting) {
+      setIsScanning(false);
+      await handleCheckIn(result.text);
     }
   };
 
   const handleCheckIn = async (guestId) => {
-    try {
-      stopCamera();
-      setLoading(true);
-      
-      const response = await api.post(`/events/${eventId}/checkin`, {
-        guestId: guestId
-      });
+    if (isSubmitting) return;
 
-      setCheckInResult(response.data.data);
+    setIsSubmitting(true);
+    setCheckInResult(null);
+    setError(null);
+
+    try {
+      const response = await api.post(`/events/${eventId}/checkin`, { guestId });
+      setCheckInResult({ ...response.data, success: true });
       setShowResult(true);
     } catch (error) {
       console.error('Erro no check-in:', error);
@@ -129,29 +68,15 @@ const CheckIn = () => {
       });
       setShowResult(true);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
+      setManualCode('');
     }
   };
 
-  const handleManualCheckIn = async (guestId) => {
-    try {
-      setLoading(true);
-      
-      const response = await api.post(`/events/${eventId}/checkin`, {
-        guestId: guestId
-      });
-
-      setCheckInResult(response.data.data);
-      setShowResult(true);
-    } catch (error) {
-      console.error('Erro no check-in manual:', error);
-      setCheckInResult({
-        success: false,
-        message: error.response?.data?.message || 'Erro ao realizar check-in'
-      });
-      setShowResult(true);
-    } finally {
-      setLoading(false);
+  const handleManualFormSubmit = (e) => {
+    e.preventDefault();
+    if (manualCode.trim()) {
+      handleCheckIn(manualCode.trim());
     }
   };
 
@@ -159,9 +84,14 @@ const CheckIn = () => {
     setCheckInResult(null);
     setShowResult(false);
     setError(null);
+    // Se a câmera estava ligada, reativa
+    if (!isScanning && document.querySelector('.qr-reader-container')) {
+      setIsScanning(true);
+    }
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -171,7 +101,7 @@ const CheckIn = () => {
     });
   };
 
-  if (loading && !isScanning) {
+  if (loading && !showResult) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -179,17 +109,14 @@ const CheckIn = () => {
     );
   }
 
-  if (error && !event) {
+  if (error && !event && !showResult) {
     return (
       <div className="text-center py-12">
         <AlertCircle className="mx-auto h-12 w-12 text-danger-500" />
         <h3 className="mt-2 text-lg font-medium text-gray-900">Erro</h3>
         <p className="mt-1 text-sm text-gray-500">{error}</p>
         <div className="mt-6">
-          <button
-            onClick={() => navigate('/events')}
-            className="btn-primary"
-          >
+          <button onClick={() => navigate('/events')} className="btn-primary">
             Voltar aos Eventos
           </button>
         </div>
@@ -199,13 +126,9 @@ const CheckIn = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate(`/events/${eventId}`)}
-            className="btn-outline inline-flex items-center"
-          >
+          <button onClick={() => navigate(`/events/${eventId}`)} className="btn-outline inline-flex items-center">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </button>
@@ -218,194 +141,94 @@ const CheckIn = () => {
         </div>
       </div>
 
-      {/* Check-in Result */}
-      {showResult && checkInResult && (
+      {showResult && checkInResult ? (
         <div className="card">
-          <div className="card-body text-center">
+          <div className="card-body text-center p-8">
             {checkInResult.success ? (
               <div className="space-y-4">
-                <CheckCircle className="mx-auto h-16 w-16 text-success-600" />
-                <h3 className="text-lg font-medium text-gray-900">Check-in Realizado!</h3>
-                <p className="text-sm text-gray-500">
-                  {checkInResult.guest?.name} foi registrado(a) com sucesso.
-                </p>
-                {checkInResult.guest?.plusOne && (
-                  <p className="text-sm text-gray-500">
-                    Acompanhante: {checkInResult.guest.plusOne}
-                  </p>
-                )}
-                <p className="text-sm text-gray-400">
-                  {new Date().toLocaleTimeString('pt-BR')}
+                <CheckCircle className="mx-auto h-20 w-20 text-success-600" />
+                <h3 className="text-2xl font-bold text-gray-900">Check-in Realizado!</h3>
+                <div className="text-lg text-gray-600 space-y-1">
+                  <p><span className="font-semibold">Participante:</span> {checkInResult.data.guest.name}</p>
+                  <p><span className="font-semibold">Código:</span> <span className="font-mono">{checkInResult.data.guest.qrCode}</span></p>
+                </div>
+                <p className="text-md text-gray-500 pt-2">
+                  Registrado às {new Date(checkInResult.data.checkedInAt).toLocaleTimeString('pt-BR')}
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <XCircle className="mx-auto h-16 w-16 text-danger-600" />
-                <h3 className="text-lg font-medium text-gray-900">Erro no Check-in</h3>
-                <p className="text-sm text-gray-500">{checkInResult.message}</p>
+                <XCircle className="mx-auto h-20 w-20 text-danger-600" />
+                <h3 className="text-2xl font-bold text-gray-900">Erro no Check-in</h3>
+                <p className="text-lg text-gray-600">{checkInResult.message}</p>
               </div>
             )}
-            <div className="mt-6">
-              <button
-                onClick={resetCheckIn}
-                className="btn-primary"
-              >
-                Continuar
+            <div className="mt-8">
+              <button onClick={resetCheckIn} className="btn-primary w-full max-w-xs mx-auto">
+                Novo Check-in
               </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Camera Scanner */}
-      {!showResult && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Scanner */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="text-lg font-medium text-gray-900">Scanner QR Code</h3>
-            </div>
-            <div className="card-body">
-              <div className="space-y-4">
-                {!isScanning ? (
-                  <div className="text-center py-12">
-                    <QrCode className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">
-                      Iniciar Scanner
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Clique no botão abaixo para iniciar a leitura do QR Code
-                    </p>
-                    <div className="mt-6">
-                      <button
-                        onClick={startCamera}
-                        className="btn-primary inline-flex items-center"
-                      >
-                        <Camera className="h-4 w-4 mr-2" />
-                        Iniciar Câmera
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-64 object-cover rounded-lg border"
-                      />
-                      <canvas
-                        ref={canvasRef}
-                        className="hidden"
-                      />
-                      <div className="absolute inset-0 border-2 border-primary-500 border-dashed rounded-lg pointer-events-none">
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                          <div className="w-32 h-32 border-2 border-primary-500 rounded-lg"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-500">
-                        Posicione o QR Code dentro da área destacada
-                      </p>
-                    </div>
-                    <div className="flex justify-center">
-                      <button
-                        onClick={stopCamera}
-                        className="btn-outline inline-flex items-center"
-                      >
-                        <CameraOff className="h-4 w-4 mr-2" />
-                        Parar Câmera
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="bg-danger-50 border border-danger-200 rounded-lg p-4">
-                    <div className="flex">
-                      <AlertCircle className="h-5 w-5 text-danger-400" />
-                      <div className="ml-3">
-                        <p className="text-sm text-danger-700">{error}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Manual Check-in */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="text-lg font-medium text-gray-900">Check-in Manual</h3>
-            </div>
-            <div className="card-body">
-              <div className="space-y-4">
+      ) : (
+        <div className="card">
+          <div className="card-body p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:divide-x md:divide-gray-200">
+              <div className="space-y-4 md:pr-8">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Ticket className="h-6 w-6 mr-3 text-primary-600" />
+                  Check-in por Código
+                </h3>
                 <p className="text-sm text-gray-500">
-                  Se o QR Code não estiver funcionando, você pode fazer o check-in manualmente.
+                  Digite o código único do participante para registrar a entrada.
                 </p>
-                
-                <div>
-                  <label className="form-label">ID do Convidado</label>
+                <form onSubmit={handleManualFormSubmit} className="flex items-center space-x-2">
                   <input
                     type="text"
-                    className="input"
-                    placeholder="Digite o ID do convidado"
-                    id="manualGuestId"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    className="input w-full"
+                    placeholder="Código do participante"
+                    disabled={isSubmitting}
                   />
-                </div>
+                  <button type="submit" className="btn-primary" disabled={isSubmitting || !manualCode.trim()}>
+                    {isSubmitting ? 'Verificando...' : 'Verificar'}
+                  </button>
+                </form>
+              </div>
 
-                <button
-                  onClick={() => {
-                    const guestId = document.getElementById('manualGuestId').value;
-                    if (guestId) {
-                      handleManualCheckIn(guestId);
-                    }
-                  }}
-                  className="btn-primary w-full"
-                >
-                  Fazer Check-in Manual
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Event Info */}
-      {event && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="text-lg font-medium text-gray-900">Informações do Evento</h3>
-          </div>
-          <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center">
-                <Clock className="h-5 w-5 text-gray-400 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Data e Hora</p>
-                  <p className="text-sm text-gray-500">{formatDate(event.date)}</p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <Users className="h-5 w-5 text-gray-400 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Convidados</p>
-                  <p className="text-sm text-gray-500">
-                    {event._count.guests} total • {event._count.checkIns} presentes
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <QrCode className="h-5 w-5 text-gray-400 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Status</p>
-                  <p className="text-sm text-gray-500">
-                    {event.isActive ? 'Ativo' : 'Inativo'}
-                  </p>
-                </div>
+              <div className="space-y-4 md:pl-8">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <QrCode className="h-6 w-6 mr-3 text-primary-600" />
+                  Escanear QR Code
+                </h3>
+                {isScanning ? (
+                  <div>
+                    <div className="w-full max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border-4 border-gray-300 shadow-lg">
+                      <QrReader
+                        onResult={handleScanResult}
+                        constraints={{ facingMode: 'environment' }}
+                        className="qr-reader-container"
+                        videoContainerStyle={{ paddingTop: 0 }}
+                      />
+                    </div>
+                    <button onClick={() => setIsScanning(false)} className="btn-outline w-full mt-4 inline-flex items-center justify-center">
+                      <CameraOff className="h-5 w-5 mr-2" />
+                      Parar Câmera
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-4">
+                      Clique no botão para ativar a câmera e escanear o QR Code.
+                    </p>
+                    <button onClick={() => setIsScanning(true)} className="btn-primary inline-flex items-center justify-center">
+                      <Camera className="h-5 w-5 mr-2" />
+                      Ativar Câmera
+                    </button>
+                  </div>
+                )}
+                {error && <p className="form-error text-center mt-2">{error}</p>}
               </div>
             </div>
           </div>

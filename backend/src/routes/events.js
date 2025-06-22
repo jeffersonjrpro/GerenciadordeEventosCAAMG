@@ -46,6 +46,18 @@ router.post('/:eventId/pause-registration', EventController.pauseRegistration);
 router.post('/:eventId/resume-registration', EventController.resumeRegistration);
 router.get('/:eventId/registration-status', EventController.getRegistrationStatus);
 
+// Configuração do formulário
+router.get('/:eventId/form-config', EventController.getFormConfig);
+router.put('/:eventId/form-config', EventController.updateFormConfig);
+
+// Configuração da página pública
+router.get('/:eventId/public-page-config', EventController.getPublicPageConfig);
+router.put('/:eventId/public-page-config', EventController.updatePublicPageConfig);
+
+// Upload e remoção de imagem
+router.post('/:eventId/image', uploadEventImage, handleUploadError, EventController.uploadEventImage);
+router.delete('/:eventId/image', EventController.removeEventImage);
+
 // Rotas de convidados
 router.get('/:eventId/guests', GuestController.getGuestsByEvent);
 router.post('/:eventId/guests', GuestController.guestValidation, GuestController.createGuest);

@@ -6,7 +6,7 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 
 - ✅ CRUD completo de usuários e eventos
 - ✅ Sistema de convites com QR Code único
-- ✅ Check-in via leitura de QR Code
+- ✅ Check-in via leitura de QR Code e código manual
 - ✅ Dashboard com estatísticas em tempo real
 - ✅ Envio de convites por email
 - ✅ Interface responsiva e moderna com TailwindCSS
@@ -18,6 +18,22 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - ✅ Upload de imagens para eventos
 - ✅ Campos personalizados para eventos
 - ✅ Sistema de permissões (Admin/Organizador)
+- ✅ **Construtor de Formulários Drag & Drop**
+- ✅ **Editor de Página Pública Personalizável**
+- ✅ **Código de Incorporação (Embed)**
+- ✅ **Visualização em Tempo Real**
+- ✅ **Temas e Cores Customizáveis**
+- ✅ **Editor de Texto Rico (React-Quill)** para descrição de eventos
+- ✅ **Geração de códigos únicos simples** (4 letras do evento + número)
+- ✅ **Página de detalhes do convidado** com QR Code e informações completas
+- ✅ **Download do QR Code** com configuração CSP adequada
+- ✅ **Check-in por QR Code e código manual** com interface clara
+- ✅ **Exportação e importação com campos personalizados**
+- ✅ **Visualização detalhada de convidados** com histórico de check-ins
+- ✅ **Sistema de check-in duplo** (QR Code + código manual)
+- ✅ **Página de detalhes do convidado** com QR Code, status e histórico
+- ✅ **Download de QR Code** com configuração de segurança CSP
+- ✅ **Listagem de convidados** com campos personalizados e códigos QR
 
 ## 🛠️ Tecnologias
 
@@ -31,6 +47,7 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - **Validation** (express-validator)
 - **CORS** (cors)
 - **Rate limiting** (express-rate-limit)
+- **Helmet** para segurança e CSP
 
 ### Frontend
 - **React 18** + React Router v6
@@ -38,8 +55,11 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - **QR Code Scanner** (react-qr-reader)
 - **React Hook Form** + Yup validation
 - **Axios** para requisições HTTP
-- **React Icons**
+- **React Icons** + **Lucide React**
 - **React Hot Toast** para notificações
+- **@dnd-kit** para drag & drop
+- **React Colorful** para seleção de cores
+- **React-Quill** para edição de texto rica
 
 ## 📦 Instalação Completa
 
@@ -100,6 +120,8 @@ cd ../frontend
 npm install
 ```
 
+Se preferir, o comando `npm run install:all` na raiz do projeto instala tudo de uma vez. As dependências do frontend já incluem pacotes para o editor de texto (`react-quill`) e para uma melhor estilização de conteúdo (`@tailwindcss/typography`).
+
 **Dependências do Frontend:**
 ```json
 {
@@ -123,7 +145,13 @@ npm install
   "@testing-library/jest-dom": "^5.17.0",
   "@testing-library/react": "^13.4.0",
   "@testing-library/user-event": "^14.5.2",
-  "react-scripts": "5.0.1"
+  "react-scripts": "5.0.1",
+  "@dnd-kit/core": "^6.3.1",
+  "@dnd-kit/sortable": "^10.0.0",
+  "@dnd-kit/utilities": "^3.2.2",
+  "@dnd-kit/modifiers": "^9.0.0",
+  "react-colorful": "^5.6.1",
+  "react-quill": "^2.0.0"
 }
 ```
 
@@ -257,10 +285,14 @@ npm run dev
 - ✅ Visualizar estatísticas em tempo real
 - ✅ Exportar dados dos convidados
 - ✅ Tornar eventos públicos/privados
+- ✅ **Construtor de Formulários Drag & Drop**
+- ✅ **Editor de Página Pública**
+- ✅ **Campos Personalizados Avançados**
+- ✅ **Código de Incorporação (Embed)**
 
 ### Para Convidados
 - ✅ Acessar eventos públicos
-- ✅ Inscrever-se via formulário
+- ✅ Inscrever-se via formulário customizado
 - ✅ Receber QR Code único
 - ✅ Confirmar presença via QR Code
 
@@ -269,6 +301,53 @@ npm run dev
 - ✅ Visualizar todos os eventos
 - ✅ Acessar estatísticas globais
 - ✅ Configurar sistema
+
+## 🎨 Novas Funcionalidades
+
+### Construtor de Formulários
+- **Drag & Drop**: Arraste campos para reordenar
+- **Tipos de Campo**: Texto, Email, Telefone, Número, Data, Checkbox
+- **Propriedades**: Rótulo, Placeholder, Obrigatório
+- **Visualização**: Preview em tempo real
+- **Configurações**: Título, descrição, mensagens personalizadas
+- **Campos Personalizados**: Integração com campos customizados do evento
+
+### Editor de Página Pública
+- **Layout Moderno**: Design responsivo e profissional
+- **Temas Customizáveis**: Cores primárias, secundárias, fundo e texto
+- **Cabeçalho**: Título, subtítulo, imagem do evento
+- **Conteúdo**: Data, local, descrição, organizador
+- **Inscrição**: Formulário integrado, textos personalizados
+- **Código Embed**: Incorporação em outros sites
+- **Visualização**: Preview em iframe
+
+### Campos Personalizados
+- **Tipos Suportados**: Texto, Email, Número, Telefone, Data
+- **Validação**: Campos obrigatórios opcionais
+- **Integração**: Automática com formulários e listas
+- **Flexibilidade**: Adicionar/remover conforme necessário
+
+### Sistema de Check-in Avançado
+- **Check-in Duplo**: QR Code + código manual (4 letras + número)
+- **Interface Clara**: Opções visuais para ambos os métodos
+- **Validação em Tempo Real**: Confirmação imediata do check-in
+- **Histórico Completo**: Registro de todos os check-ins realizados
+- **Códigos Únicos**: Geração automática de códigos simples e memoráveis
+
+### Página de Detalhes do Convidado
+- **Informações Completas**: Dados pessoais, campos personalizados, status
+- **QR Code Visual**: Exibição do QR Code com opção de download
+- **Histórico de Presença**: Status de confirmação e check-ins realizados
+- **Informações do Evento**: Data, local e detalhes do evento
+- **Download de QR Code**: Funcionalidade com configuração CSP adequada
+- **Edição de Convidado**: Acesso rápido para editar informações
+
+### Listagem de Convidados Melhorada
+- **Campos Personalizados**: Exibição de campos customizados na tabela
+- **Códigos QR**: Coluna com códigos QR clicáveis
+- **Filtros Avançados**: Por status, presença e busca textual
+- **Exportação Completa**: Inclui campos personalizados no CSV
+- **Importação Inteligente**: Suporte a campos personalizados via CSV
 
 ## 🎯 Estrutura do Projeto
 
@@ -287,6 +366,11 @@ GerenciadordeEventosCAAMG/
 ├── frontend/                   # React SPA
 │   ├── src/
 │   │   ├── components/        # Componentes reutilizáveis
+│   │   │   ├── FormBuilder.js # Construtor de formulários
+│   │   │   ├── FormField.js   # Campo de formulário
+│   │   │   ├── FormPreview.js # Visualização de formulário
+│   │   │   ├── FormSettings.js # Configurações de formulário
+│   │   │   └── PublicPageEditor.js # Editor de página pública
 │   │   ├── pages/             # Páginas da aplicação
 │   │   ├── contexts/          # Contextos React
 │   │   ├── services/          # Serviços de API
@@ -343,6 +427,7 @@ npm run build:all      # Build de produção completo
 - **Migrações** automáticas
 - **Seed** para dados iniciais
 - **Studio** para visualização
+- **Campos JSON** para configurações de formulário e página
 
 ### Frontend
 - **TailwindCSS** com configuração personalizada
@@ -350,6 +435,9 @@ npm run build:all      # Build de produção completo
 - **Context API** para estado global
 - **Axios** com interceptors
 - **React Hook Form** com validação
+- **@dnd-kit** para drag & drop
+- **React Colorful** para seleção de cores
+- **Editor de Texto Rico (React-Quill)**
 
 ## 🚨 Solução de Problemas
 
@@ -372,9 +460,19 @@ lsof -ti:3001 | xargs kill -9
 
 ### Erro de Dependências
 ```bash
-# Limpar cache e reinstalar
+# Limpar cache e reinstale
 rm -rf node_modules package-lock.json
 npm install
+
+# Para problemas com @dnd-kit
+npm install --legacy-peer-deps
+```
+
+### Erro de Sintaxe no Backend
+```bash
+# Verificar sintaxe do JavaScript
+cd backend
+node -c src/controllers/eventController.js
 ```
 
 ## 🚀 Deploy em Produção
@@ -406,7 +504,7 @@ npm run build        # Build de produção
 
 - [ ] Integração com WhatsApp Business API
 - [ ] Sistema de pagamentos (PIX, cartão)
-- [ ] Formulários customizáveis avançados
+- [ ] Formulários customizáveis avançados (múltiplas páginas)
 - [ ] Suporte a múltiplos organizadores por evento
 - [ ] Exportação avançada (Excel, PDF, relatórios)
 - [ ] Widget para embed em outros sites
@@ -414,6 +512,9 @@ npm run build        # Build de produção
 - [ ] Sistema de notificações push
 - [ ] Backup automático do banco
 - [ ] Dashboard administrativo avançado
+- [ ] Templates de formulários pré-definidos
+- [ ] Sistema de temas pré-configurados
+- [ ] Analytics avançado de formulários
 
 ## 🤝 Contribuição
 

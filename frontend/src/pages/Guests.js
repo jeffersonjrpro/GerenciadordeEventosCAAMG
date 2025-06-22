@@ -1,24 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Eye,
+  QrCode,
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  MapPin,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ArrowLeft
+} from 'lucide-react';
 
 const Guests = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [guests, setGuests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
-  const [presence, setPresence] = useState('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newGuest, setNewGuest] = useState({ name: '', email: '', phone: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [presenceFilter, setPresenceFilter] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [formLink, setFormLink] = useState('');
   const [event, setEvent] = useState(null);
   const [customFields, setCustomFields] = useState([]);
+  const [formLink, setFormLink] = useState('');
 
   useEffect(() => {
     console.log('Guests - eventId recebido:', eventId);
@@ -27,14 +42,14 @@ const Guests = () => {
   }, [eventId]);
 
   useEffect(() => {
-    if (search || status !== 'all' || presence !== 'all') {
+    if (searchTerm || statusFilter !== '' || presenceFilter !== '') {
       const delayDebounceFn = setTimeout(() => {
         fetchGuests();
       }, 300);
 
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [search, status, presence]);
+  }, [searchTerm, statusFilter, presenceFilter]);
 
   useEffect(() => {
     setFormLink(`${window.location.origin}/event/${eventId}/formulario`);
@@ -56,10 +71,11 @@ const Guests = () => {
   async function fetchGuests() {
     setLoading(true);
     try {
-      const response = await api.get(`/events/${eventId}/guests`, {
-        params: { search, status, presence }
+      const response = await api.get(`/guests/events/${eventId}/guests`, {
+        params: { search: searchTerm, status: statusFilter, presence: presenceFilter }
       });
-      setGuests(response.data.data || []);
+      setGuests(response.data.data.guests);
+      setEvent(response.data.data.event);
     } catch (error) {
       console.error('Erro ao buscar convidados:', error);
       // Só mostra erro se for um erro de rede/conexão, não quando não há dados
@@ -77,296 +93,350 @@ const Guests = () => {
     }
   }
 
-  async function handleAddGuest(e) {
-    e.preventDefault();
-    console.log('Tentando adicionar convidado:', newGuest);
-    console.log('EventId:', eventId);
-    
-    // Validação básica
-    if (!newGuest.name.trim()) {
-      alert('Nome é obrigatório');
-      return;
-    }
-    
+  const handleExport = async () => {
     try {
-      // Preparar dados do convidado incluindo campos personalizados
-      const guestData = {
-        name: newGuest.name,
-        email: newGuest.email || null,
-        phone: newGuest.phone || null,
-        customFields: {}
-      };
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+      if (presenceFilter) params.append('presence', presenceFilter);
 
-      // Adicionar campos personalizados
-      customFields.forEach(field => {
-        if (newGuest[field] !== undefined && newGuest[field] !== '') {
-          guestData.customFields[field] = newGuest[field];
-        }
-      });
-
-      // Remover campos personalizados do objeto principal
-      const cleanGuestData = {
-        name: guestData.name,
-        email: guestData.email,
-        phone: guestData.phone,
-        customFields: guestData.customFields
-      };
-
-      console.log('Dados limpos enviados:', cleanGuestData);
-
-      const response = await api.post(`/events/${eventId}/guests`, cleanGuestData);
-      console.log('Resposta do servidor:', response.data);
-      setGuests([response.data.data, ...guests]);
-      setShowAddModal(false);
-      setNewGuest({ name: '', email: '', phone: '' });
-    } catch (error) {
-      console.error('Erro completo:', error);
-      console.error('Status:', error.response?.status);
-      console.error('Data:', error.response?.data);
-      if (error.response && error.response.data && error.response.data.message) {
-        alert(`Erro ao adicionar convidado: ${error.response.data.message}`);
-      } else if (error.response && error.response.data && error.response.data.details) {
-        const errorDetails = error.response.data.details.map(d => d.msg).join(', ');
-        alert(`Erro de validação: ${errorDetails}`);
-      } else {
-        alert('Erro ao adicionar convidado. Verifique os dados e tente novamente.');
-      }
-    }
-  }
-
-  async function handleImportCSV(e) {
-    e.preventDefault();
-    if (!csvFile) return;
-    setImporting(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', csvFile);
-      const response = await api.post(`/events/${eventId}/guests/import`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setGuests([...response.data.data, ...guests]);
-      setCsvFile(null);
-      setShowAddModal(false);
-    } catch (error) {
-      alert('Erro ao importar CSV');
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  async function handleExportCSV() {
-    setExporting(true);
-    try {
-      const response = await api.get(`/events/${eventId}/guests/export`, {
-        params: { status, presence },
+      const response = await api.get(`/guests/events/${eventId}/guests/export?${params}`, {
         responseType: 'blob'
       });
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `convidados-${eventId}.csv`);
+      link.setAttribute('download', `convidados_${event?.name || 'evento'}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      alert('Erro ao exportar CSV');
-    } finally {
-      setExporting(false);
+      console.error('Erro ao exportar:', error);
+      alert('Erro ao exportar arquivo');
     }
-  }
+  };
 
-  async function handleCopyLink() {
-    setCopying(true);
-    try {
-      await navigator.clipboard.writeText(formLink);
-      alert('Link copiado!');
-    } catch {
-      alert('Erro ao copiar link');
-    } finally {
-      setCopying(false);
+  const handleImport = async () => {
+    if (!importFile) {
+      alert('Selecione um arquivo CSV');
+      return;
     }
-  }
 
-  async function handleConfirm(guestId) {
     try {
-      await api.put(`/events/${eventId}/guests/${guestId}/confirm`);
+      setImporting(true);
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      await api.post(`/guests/events/${eventId}/guests/import`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setShowImportModal(false);
+      setImportFile(null);
       fetchGuests();
-    } catch {
-      alert('Erro ao confirmar presença');
+      alert('Convidados importados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao importar:', error);
+      alert('Erro ao importar arquivo');
+    } finally {
+      setImporting(false);
     }
-  }
+  };
 
-  async function handleDelete(guestId) {
-    if (!window.confirm('Deseja remover este convidado?')) return;
-    try {
-      await api.delete(`/events/${eventId}/guests/${guestId}`);
-      setGuests(guests.filter(g => g.id !== guestId));
-    } catch {
-      alert('Erro ao remover convidado');
-    }
-  }
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getCustomFieldValue = (guest, fieldId) => {
+    if (!guest.customFields || !guest.customFields[fieldId]) return '';
+    return guest.customFields[fieldId];
+  };
+
+  const getCustomFields = () => {
+    if (!event?.formConfig?.fields) return [];
+    return event.formConfig.fields.filter(field => 
+      field.id !== 'name' && field.id !== 'email' && field.id !== 'phone'
+    );
+  };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Convidados</h1>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">Adicionar</button>
-          <button onClick={() => {
-            console.log('Testando API...');
-            api.get(`/events/${eventId}/guests`).then(r => console.log('API OK:', r.data)).catch(e => console.error('API Error:', e));
-          }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Testar API</button>
-          <label className="px-4 py-2 bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
-            Importar CSV
-            <input type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files[0])} />
-          </label>
-          <button onClick={handleImportCSV} disabled={!csvFile || importing} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50">{importing ? 'Importando...' : 'Enviar CSV'}</button>
-          <button onClick={handleExportCSV} disabled={exporting} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{exporting ? 'Exportando...' : 'Exportar CSV'}</button>
-          <button onClick={handleCopyLink} disabled={copying} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{copying ? 'Copiando...' : 'Copiar link formulário'}</button>
-          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">Voltar</button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <button onClick={() => navigate(`/events/${eventId}`)} className="btn-outline inline-flex items-center">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Convidados</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {event?.name} • {guests.length} convidado(s)
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <button onClick={() => setShowImportModal(true)} className="btn-outline inline-flex items-center">
+            <Upload className="h-4 w-4 mr-2" />
+            Importar
+          </button>
+          <button onClick={handleExport} className="btn-outline inline-flex items-center">
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
+          </button>
+          <button onClick={() => navigate(`/events/${eventId}/guests/add`)} className="btn-primary inline-flex items-center">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar
+          </button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Buscar por nome, e-mail ou telefone..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="px-3 py-2 border rounded w-full md:w-1/3"
-        />
-        <select
-          value={status}
-          onChange={e => setStatus(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="all">Todos os status</option>
-          <option value="confirmed">Confirmados</option>
-          <option value="pending">Pendentes</option>
-        </select>
-        <select
-          value={presence}
-          onChange={e => setPresence(e.target.value)}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="all">Todas as presenças</option>
-          <option value="present">Presentes</option>
-          <option value="absent">Ausentes</option>
-        </select>
-      </div>
-
-      {/* Lista de convidados */}
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Carregando...</div>
-        ) : guests.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="text-gray-500 mb-4">Nenhum convidado encontrado.</div>
-            <button 
-              onClick={() => setShowAddModal(true)} 
-              className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
-            >
-              Adicionar primeiro convidado
-            </button>
-          </div>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Presença</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {guests.map(guest => (
-                <tr key={guest.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{guest.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{guest.email || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{guest.phone || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {guest.confirmed ? (
-                      <span className="px-2 py-1 rounded bg-green-100 text-green-800 text-xs">Confirmado</span>
-                    ) : (
-                      <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs">Pendente</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {guest.checkIns && guest.checkIns.length > 0 ? (
-                      <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs">Presente</span>
-                    ) : (
-                      <span className="px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs">Ausente</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap flex gap-2">
-                    {!guest.confirmed && (
-                      <button onClick={() => handleConfirm(guest.id)} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200">Confirmar</button>
-                    )}
-                    <button onClick={() => handleDelete(guest.id)} className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200">Excluir</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Modal adicionar convidado */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowAddModal(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">&times;</button>
-            <h2 className="text-xl font-bold mb-4">Adicionar Convidado</h2>
-            <form onSubmit={handleAddGuest} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Nome *"
-                value={newGuest.name}
-                onChange={e => setNewGuest({ ...newGuest, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              />
-              <input
-                type="email"
-                placeholder="E-mail (opcional)"
-                value={newGuest.email}
-                onChange={e => setNewGuest({ ...newGuest, email: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-              />
-              <input
-                type="text"
-                placeholder="Telefone (opcional)"
-                value={newGuest.phone}
-                onChange={e => setNewGuest({ ...newGuest, phone: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-              />
-              
-              {/* Campos personalizados */}
-              {customFields.length > 0 && (
-                <div className="border-t pt-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Campos Personalizados</h3>
-                  {customFields.map(field => (
-                    <input
-                      key={field}
-                      type="text"
-                      placeholder={field}
-                      value={newGuest[field] || ''}
-                      onChange={e => setNewGuest({ ...newGuest, [field]: e.target.value })}
-                      className="w-full px-3 py-2 border rounded mb-2"
-                    />
-                  ))}
-                </div>
-              )}
-              
-              <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Adicionar</button>
+      <div className="card">
+        <div className="card-body">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="form-label">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input pl-10"
+                  placeholder="Nome, e-mail ou telefone"
+                />
               </div>
-            </form>
+            </div>
+            
+            <div>
+              <label className="form-label">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="input"
+              >
+                <option value="">Todos</option>
+                <option value="confirmed">Confirmados</option>
+                <option value="pending">Pendentes</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="form-label">Presença</label>
+              <select
+                value={presenceFilter}
+                onChange={(e) => setPresenceFilter(e.target.value)}
+                className="input"
+              >
+                <option value="">Todos</option>
+                <option value="present">Presentes</option>
+                <option value="absent">Ausentes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="card">
+        <div className="card-body p-0">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Convidado
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contato
+                  </th>
+                  {getCustomFields().map(field => (
+                    <th key={field.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {field.label}
+                    </th>
+                  ))}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Presença
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    QR Code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {guests.map((guest) => (
+                  <tr key={guest.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                            <User className="h-5 w-5 text-primary-600" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{guest.name}</div>
+                          <div className="text-sm text-gray-500">
+                            Inscrito em {formatDate(guest.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {guest.email && (
+                          <div className="flex items-center">
+                            <Mail className="h-4 w-4 mr-1 text-gray-400" />
+                            {guest.email}
+                          </div>
+                        )}
+                        {guest.phone && (
+                          <div className="flex items-center mt-1">
+                            <Phone className="h-4 w-4 mr-1 text-gray-400" />
+                            {guest.phone}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {getCustomFields().map(field => (
+                      <td key={field.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {getCustomFieldValue(guest, field.id)}
+                      </td>
+                    ))}
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        guest.confirmed 
+                          ? 'bg-success-100 text-success-800' 
+                          : 'bg-warning-100 text-warning-800'
+                      }`}>
+                        {guest.confirmed ? (
+                          <>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Confirmado
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pendente
+                          </>
+                        )}
+                      </span>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        guest.checkIns.length > 0 
+                          ? 'bg-success-100 text-success-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {guest.checkIns.length > 0 ? (
+                          <>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Presente
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Ausente
+                          </>
+                        )}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 font-mono">
+                        {guest.qrCode}
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => navigate(`/events/${eventId}/guests/${guest.id}/details`)}
+                          className="text-primary-600 hover:text-primary-900 inline-flex items-center"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </button>
+                        <button
+                          onClick={() => navigate(`/events/${eventId}/guests/${guest.id}/edit`)}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de Importação */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Importar Convidados</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label">Arquivo CSV</label>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setImportFile(e.target.files[0])}
+                    className="input"
+                  />
+                </div>
+                <div className="text-sm text-gray-500">
+                  <p>O arquivo deve conter as colunas:</p>
+                  <ul className="list-disc list-inside mt-1">
+                    <li>nome (obrigatório)</li>
+                    <li>email</li>
+                    <li>telefone</li>
+                    {getCustomFields().map(field => (
+                      <li key={field.id}>{field.id} ({field.label})</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="btn-outline"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={importing || !importFile}
+                    className="btn-primary"
+                  >
+                    {importing ? 'Importando...' : 'Importar'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

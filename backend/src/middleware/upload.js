@@ -6,9 +6,11 @@ const fs = require('fs');
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = 'uploads/events';
+    console.log('📁 Upload destination:', uploadDir);
     
     // Criar diretório se não existir
     if (!fs.existsSync(uploadDir)) {
+      console.log('📁 Criando diretório:', uploadDir);
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     
@@ -17,16 +19,22 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     // Gerar nome único para o arquivo
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+    console.log('📄 Nome do arquivo gerado:', filename);
+    cb(null, filename);
   }
 });
 
 // Filtro para tipos de arquivo permitidos
 const fileFilter = (req, file, cb) => {
+  console.log('🔍 Verificando arquivo:', file.originalname, 'MIME:', file.mimetype);
+  
   // Permitir apenas imagens
   if (file.mimetype.startsWith('image/')) {
+    console.log('✅ Arquivo de imagem aceito');
     cb(null, true);
   } else {
+    console.log('❌ Arquivo rejeitado - não é imagem');
     cb(new Error('Apenas arquivos de imagem são permitidos!'), false);
   }
 };
@@ -45,14 +53,26 @@ const uploadEventImage = upload.single('image');
 
 // Middleware para tratamento de erros de upload
 const handleUploadError = (error, req, res, next) => {
+  console.error('Erro no upload:', error);
+  
   if (error instanceof multer.MulterError) {
+    console.error('Erro Multer:', error.code);
+    
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'Arquivo muito grande. Tamanho máximo: 5MB'
       });
     }
+    
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        error: 'Campo de arquivo inesperado'
+      });
+    }
+    
     return res.status(400).json({
-      error: 'Erro no upload do arquivo'
+      error: 'Erro no upload do arquivo',
+      details: error.message
     });
   }
   
@@ -62,6 +82,7 @@ const handleUploadError = (error, req, res, next) => {
     });
   }
   
+  console.error('Erro não tratado no upload:', error);
   next(error);
 };
 

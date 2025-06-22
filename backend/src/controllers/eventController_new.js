@@ -73,6 +73,11 @@ class EventController {
         if (isNaN(eventDate.getTime())) {
           throw new Error('Data deve ser válida');
         }
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (eventDate < oneHourAgo) {
+          throw new Error('Data do evento não pode ser no passado');
+        }
         return true;
       }),
     body('location')
@@ -99,33 +104,11 @@ class EventController {
       .withMessage('Campos personalizados devem ser um objeto'),
     body('isPublic')
       .optional()
-      .custom((value) => {
-        if (value === undefined || value === null || value === '') {
-          return true;
-        }
-        if (typeof value === 'boolean') {
-          return true;
-        }
-        if (value === 'true' || value === 'false') {
-          return true;
-        }
-        throw new Error('isPublic deve ser um valor booleano');
-      })
+      .isBoolean()
       .withMessage('isPublic deve ser um valor booleano'),
     body('isActive')
       .optional()
-      .custom((value) => {
-        if (value === undefined || value === null || value === '') {
-          return true;
-        }
-        if (typeof value === 'boolean') {
-          return true;
-        }
-        if (value === 'true' || value === 'false') {
-          return true;
-        }
-        throw new Error('isActive deve ser um valor booleano');
-      })
+      .isBoolean()
       .withMessage('isActive deve ser um valor booleano')
   ];
 
@@ -272,15 +255,13 @@ class EventController {
   // Atualizar evento
   static async updateEvent(req, res) {
     try {
-      console.log('🔍 UpdateEvent - Iniciando atualização');
-      console.log('🔍 UpdateEvent - Dados recebidos:', req.body);
-      console.log('🔍 UpdateEvent - Parâmetros:', req.params);
-      console.log('🔍 UpdateEvent - Arquivo recebido:', req.file);
-      console.log('🔍 UpdateEvent - Headers:', req.headers);
+      console.log('UpdateEvent - Dados recebidos:', req.body);
+      console.log('UpdateEvent - Parâmetros:', req.params);
+      console.log('UpdateEvent - Arquivo recebido:', req.file);
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.log('❌ UpdateEvent - Erros de validação:', errors.array());
+        console.log('UpdateEvent - Erros de validação:', errors.array());
         return res.status(400).json({
           error: 'Dados inválidos',
           details: errors.array()
@@ -292,21 +273,19 @@ class EventController {
       
       if (req.file) {
         updateData.imageUrl = `/uploads/events/${req.file.filename}`;
-        console.log('✅ UpdateEvent - Nova imagem:', updateData.imageUrl);
+        console.log('UpdateEvent - Nova imagem:', updateData.imageUrl);
       }
 
-      console.log('🔍 UpdateEvent - Dados para atualização:', updateData);
-      
+      console.log('UpdateEvent - Dados para atualização:', updateData);
       const event = await EventService.updateEvent(eventId, req.user.id, updateData);
 
-      console.log('✅ UpdateEvent - Evento atualizado com sucesso');
       res.json({
         message: 'Evento atualizado com sucesso',
         data: event
       });
     } catch (error) {
-      console.error('❌ Erro ao atualizar evento:', error);
-      console.error('❌ Stack trace:', error.stack);
+      console.error('Erro ao atualizar evento:', error);
+      console.error('Stack trace:', error.stack);
       
       if (error.message === 'Evento não encontrado') {
         return res.status(404).json({
@@ -417,127 +396,6 @@ class EventController {
     }
   }
 
-  // Buscar evento para preview (sem restrições)
-  static async getEventPreview(req, res) {
-    try {
-      const { eventId } = req.params;
-      console.log('🔍 getEventPreview - eventId:', eventId);
-
-      const event = await EventService.getEventForPreview(eventId);
-      console.log('✅ getEventPreview - evento retornado:', JSON.stringify(event, null, 2));
-
-      if (!event) {
-        console.log('❌ getEventPreview - evento não encontrado');
-        return res.status(404).json({
-          success: false,
-          message: 'Evento não encontrado'
-        });
-      }
-
-      console.log('✅ getEventPreview - enviando resposta de sucesso');
-      res.json({
-        success: true,
-        data: event
-      });
-    } catch (error) {
-      console.error('❌ Erro ao buscar evento para preview:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  }
-
-  // Buscar configuração do formulário público
-  static async getPublicFormConfig(req, res) {
-    try {
-      const { eventId } = req.params;
-      console.log('🔍 getPublicFormConfig - eventId:', eventId);
-
-      const config = await EventService.getPublicFormConfig(eventId);
-      console.log('✅ getPublicFormConfig - config retornado:', JSON.stringify(config, null, 2));
-
-      res.json({
-        success: true,
-        data: config
-      });
-    } catch (error) {
-      console.error('❌ Erro ao buscar configuração do formulário público:', error);
-      
-      if (error.message === 'Evento não encontrado') {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  }
-
-  // Buscar configuração do formulário para preview (sem restrições)
-  static async getPublicFormConfigForPreview(req, res) {
-    try {
-      const { eventId } = req.params;
-      console.log('🔍 getPublicFormConfigForPreview - eventId:', eventId);
-
-      const config = await EventService.getPublicFormConfigForPreview(eventId);
-      console.log('✅ getPublicFormConfigForPreview - config retornado:', JSON.stringify(config, null, 2));
-
-      res.json({
-        success: true,
-        data: config
-      });
-    } catch (error) {
-      console.error('❌ Erro ao buscar configuração do formulário para preview:', error);
-      
-      if (error.message === 'Evento não encontrado') {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  }
-
-  // Buscar configuração da página pública para preview (sem restrições)
-  static async getPublicPageConfigForPreview(req, res) {
-    try {
-      const { eventId } = req.params;
-      console.log('🔍 getPublicPageConfigForPreview - eventId:', eventId);
-
-      const config = await EventService.getPublicPageConfigForPreview(eventId);
-      console.log('✅ getPublicPageConfigForPreview - config retornado:', JSON.stringify(config, null, 2));
-
-      res.json({
-        success: true,
-        data: config
-      });
-    } catch (error) {
-      console.error('❌ Erro ao buscar configuração da página pública para preview:', error);
-      
-      if (error.message === 'Evento não encontrado') {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  }
-
   // Verificar se evento está cheio
   static async isEventFull(req, res) {
     try {
@@ -613,8 +471,7 @@ class EventController {
         error: 'Erro interno do servidor'
       });
     }
-  }
-  
+
   // Verificar status das inscrições
   static async getRegistrationStatus(req, res) {
     try {
@@ -738,74 +595,6 @@ class EventController {
 
       res.status(500).json({
         error: 'Erro interno do servidor'
-      });
-    }
-  }
-
-  // Upload de imagem do evento
-  static async uploadEventImage(req, res) {
-    try {
-      const { eventId } = req.params;
-
-      if (!req.file) {
-        return res.status(400).json({
-          error: 'Nenhuma imagem foi enviada'
-        });
-      }
-
-      const imageUrl = `/uploads/events/${req.file.filename}`;
-      
-      // Atualizar o evento com a nova imagem
-      const updatedEvent = await EventService.updateEvent(eventId, req.user.id, { imageUrl });
-
-      res.json({
-        message: 'Imagem do evento atualizada com sucesso',
-        data: {
-          imageUrl: updatedEvent.imageUrl
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao fazer upload da imagem:', error);
-      
-      if (error.message === 'Evento não encontrado') {
-        return res.status(404).json({
-          error: error.message
-        });
-      }
-
-      res.status(500).json({
-        error: 'Erro interno do servidor',
-        message: error.message
-      });
-    }
-  }
-
-  // Remover imagem do evento
-  static async removeEventImage(req, res) {
-    try {
-      const { eventId } = req.params;
-
-      // Atualizar o evento removendo a imagem
-      const updatedEvent = await EventService.updateEvent(eventId, req.user.id, { imageUrl: null });
-
-      res.json({
-        message: 'Imagem do evento removida com sucesso',
-        data: {
-          imageUrl: null
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao remover imagem:', error);
-      
-      if (error.message === 'Evento não encontrado') {
-        return res.status(404).json({
-          error: error.message
-        });
-      }
-
-      res.status(500).json({
-        error: 'Erro interno do servidor',
-        message: error.message
       });
     }
   }

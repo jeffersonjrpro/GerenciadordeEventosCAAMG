@@ -1,12 +1,54 @@
 const { body, validationResult } = require('express-validator');
 const GuestService = require('../services/guestService');
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const QRCode = require('qrcode');
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const fs = require('fs');
 const path = require('path');
-const QRCode = require('qrcode');
+
+const prisma = new PrismaClient();
+
+// Função auxiliar para gerar código único simples
+async function generateSimpleCode(eventId) {
+  // Buscar o evento para pegar o nome
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { name: true }
+  });
+
+  if (!event) {
+    throw new Error('Evento não encontrado');
+  }
+
+  // Pegar as 4 primeiras letras do nome do evento (ou menos se o nome for menor)
+  const eventPrefix = event.name.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '');
+  
+  // Se não tiver 4 letras, completar com X
+  const prefix = eventPrefix.padEnd(4, 'X');
+  
+  // Tentar gerar um código único (máximo 10 tentativas)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    // Gerar número único
+    const timestamp = Date.now().toString().slice(-6); // Últimos 6 dígitos do timestamp
+    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const code = `${prefix}${timestamp}${randomSuffix}`;
+    
+    // Verificar se o código já existe
+    const existingGuest = await prisma.guest.findFirst({
+      where: { qrCode: code }
+    });
+    
+    if (!existingGuest) {
+      return code;
+    }
+    
+    // Aguardar um pouco antes da próxima tentativa
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  
+  throw new Error('Não foi possível gerar um código único após 10 tentativas');
+}
 
 class GuestController {
   // Validações para criação/atualização de convidado
@@ -164,28 +206,46 @@ class GuestController {
     }
   }
 
-  // Gerar QR Code como imagem
+  // Gerar QR Code
   static async generateQRCode(req, res) {
     try {
       const { qrCode } = req.params;
-      const qrCodeImage = await GuestService.generateQRCodeImage(qrCode);
 
-      res.json({
-        data: {
-          qrCode,
-          image: qrCodeImage
-        }
+      const guest = await prisma.guest.findFirst({
+        where: { qrCode }
       });
+
+      if (!guest) {
+        return res.status(404).json({
+          success: false,
+          message: 'QR Code inválido'
+        });
+      }
+
+      // Gerar QR Code como buffer de imagem
+      const qrCodeBuffer = await QRCode.toBuffer(qrCode, {
+        width: 300,
+        margin: 2,
+        type: 'image/png'
+      });
+
+      // Configurar headers para imagem
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Content-Length', qrCodeBuffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache por 1 ano
+      
+      // Enviar a imagem
+      res.send(qrCodeBuffer);
     } catch (error) {
       console.error('Erro ao gerar QR Code:', error);
-      
       res.status(500).json({
-        error: 'Erro interno do servidor'
+        success: false,
+        message: 'Erro interno do servidor'
       });
     }
   }
 
-  // Buscar convidados de um evento com filtros
+  // Buscar convidados de um evento
   static async getGuestsByEvent(req, res) {
     try {
       const { eventId } = req.params;
@@ -247,9 +307,37 @@ class GuestController {
         filteredGuests = guests.filter(guest => guest.checkIns.length === 0);
       }
 
+      // Processar campos personalizados para cada convidado
+      const processedGuests = filteredGuests.map(guest => {
+        const guestData = { ...guest };
+        
+        // Processar campos personalizados
+        if (guest.customFields) {
+          try {
+            guestData.customFields = typeof guest.customFields === 'string' 
+              ? JSON.parse(guest.customFields) 
+              : guest.customFields;
+          } catch (error) {
+            console.error('Erro ao processar campos personalizados:', error);
+            guestData.customFields = {};
+          }
+        } else {
+          guestData.customFields = {};
+        }
+
+        return guestData;
+      });
+
       res.json({
         success: true,
-        data: filteredGuests
+        data: {
+          guests: processedGuests,
+          event: {
+            id: event.id,
+            name: event.name,
+            formConfig: event.formConfig
+          }
+        }
       });
     } catch (error) {
       console.error('Erro ao buscar convidados:', error);
@@ -290,7 +378,7 @@ class GuestController {
       }
 
       // Gerar QR Code único
-      const qrCode = `GUEST_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const qrCode = await generateSimpleCode(eventId);
 
       // Criar convidado
       const guest = await prisma.guest.create({
@@ -510,6 +598,9 @@ class GuestController {
         where: {
           id: eventId,
           userId: req.user.id
+        },
+        include: {
+          formConfig: true
         }
       });
 
@@ -530,6 +621,11 @@ class GuestController {
       const results = [];
       const errors = [];
 
+      // Obter campos personalizados do evento
+      const customFields = event.formConfig?.fields?.filter(field => 
+        field.id !== 'name' && field.id !== 'email' && field.id !== 'phone'
+      ) || [];
+
       // Ler arquivo CSV
       fs.createReadStream(req.file.path)
         .pipe(csv())
@@ -540,11 +636,27 @@ class GuestController {
             return;
           }
 
-          results.push({
+          // Preparar dados base
+          const guestData = {
             name: data.nome.trim(),
             email: data.email ? data.email.trim() : null,
             phone: data.telefone ? data.telefone.trim() : null
+          };
+
+          // Adicionar campos personalizados
+          const customFieldsData = {};
+          customFields.forEach(field => {
+            if (data[field.id] !== undefined) {
+              customFieldsData[field.id] = data[field.id].trim();
+            }
           });
+
+          // Adicionar campos personalizados se existirem
+          if (Object.keys(customFieldsData).length > 0) {
+            guestData.customFields = JSON.stringify(customFieldsData);
+          }
+
+          results.push(guestData);
         })
         .on('end', async () => {
           try {
@@ -562,7 +674,7 @@ class GuestController {
             // Inserir convidados no banco
             const createdGuests = [];
             for (const guestData of results) {
-              const qrCode = `GUEST_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const qrCode = await generateSimpleCode(eventId);
               
               const guest = await prisma.guest.create({
                 data: {
@@ -658,38 +770,84 @@ class GuestController {
         filteredGuests = guests.filter(guest => guest.checkIns.length === 0);
       }
 
+      // Preparar cabeçalhos base
+      const baseHeaders = [
+        { id: 'nome', title: 'Nome' },
+        { id: 'email', title: 'E-mail' },
+        { id: 'telefone', title: 'Telefone' },
+        { id: 'status', title: 'Status' },
+        { id: 'presenca', title: 'Presença' },
+        { id: 'data_confirmacao', title: 'Data Confirmação' },
+        { id: 'data_checkin', title: 'Data Check-in' },
+        { id: 'qr_code', title: 'QR Code' }
+      ];
+
+      // Adicionar campos personalizados se existirem
+      const customHeaders = [];
+      if (event.formConfig && event.formConfig.fields) {
+        event.formConfig.fields.forEach(field => {
+          if (field.id !== 'name' && field.id !== 'email' && field.id !== 'phone') {
+            customHeaders.push({
+              id: field.id,
+              title: field.label
+            });
+          }
+        });
+      }
+
+      const allHeaders = [...baseHeaders, ...customHeaders];
+
       // Preparar dados para CSV
-      const csvData = filteredGuests.map(guest => ({
-        nome: guest.name,
-        email: guest.email || '',
-        telefone: guest.phone || '',
-        status: guest.confirmed ? 'Confirmado' : 'Pendente',
-        presenca: guest.checkIns.length > 0 ? 'Presente' : 'Ausente',
-        data_confirmacao: guest.confirmedAt ? new Date(guest.confirmedAt).toLocaleDateString('pt-BR') : '',
-        data_checkin: guest.checkIns.length > 0 ? new Date(guest.checkIns[0].checkedInAt).toLocaleString('pt-BR') : '',
-        qr_code: guest.qrCode
-      }));
+      const csvData = filteredGuests.map(guest => {
+        const baseData = {
+          nome: guest.name,
+          email: guest.email || '',
+          telefone: guest.phone || '',
+          status: guest.confirmed ? 'Confirmado' : 'Pendente',
+          presenca: guest.checkIns.length > 0 ? 'Presente' : 'Ausente',
+          data_confirmacao: guest.confirmedAt ? new Date(guest.confirmedAt).toLocaleDateString('pt-BR') : '',
+          data_checkin: guest.checkIns.length > 0 ? new Date(guest.checkIns[0].checkedInAt).toLocaleString('pt-BR') : '',
+          qr_code: guest.qrCode
+        };
+
+        // Adicionar campos personalizados
+        const customData = {};
+        if (guest.customFields) {
+          try {
+            const parsedFields = typeof guest.customFields === 'string' 
+              ? JSON.parse(guest.customFields) 
+              : guest.customFields;
+            
+            customHeaders.forEach(header => {
+              customData[header.id] = parsedFields[header.id] || '';
+            });
+          } catch (error) {
+            console.error('Erro ao processar campos personalizados:', error);
+          }
+        }
+
+        return { ...baseData, ...customData };
+      });
+
+      // Criar diretório temp se não existir
+      const tempDir = path.join(__dirname, '../../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
 
       // Configurar CSV Writer
+      const fileName = `convidados_${eventId}_${Date.now()}.csv`;
+      const filePath = path.join(tempDir, fileName);
+      
       const csvWriter = createCsvWriter({
-        path: path.join(__dirname, '../../temp', `convidados_${eventId}_${Date.now()}.csv`),
-        header: [
-          { id: 'nome', title: 'Nome' },
-          { id: 'email', title: 'E-mail' },
-          { id: 'telefone', title: 'Telefone' },
-          { id: 'status', title: 'Status' },
-          { id: 'presenca', title: 'Presença' },
-          { id: 'data_confirmacao', title: 'Data Confirmação' },
-          { id: 'data_checkin', title: 'Data Check-in' },
-          { id: 'qr_code', title: 'QR Code' }
-        ]
+        path: filePath,
+        header: allHeaders
       });
 
       // Escrever CSV
       await csvWriter.writeRecords(csvData);
 
       // Enviar arquivo
-      const filePath = csvWriter.csvStringifier.path;
       res.download(filePath, `convidados_${event.name}_${new Date().toISOString().split('T')[0]}.csv`, (err) => {
         if (err) {
           console.error('Erro ao enviar arquivo:', err);
@@ -754,6 +912,99 @@ class GuestController {
       });
     } catch (error) {
       console.error('Erro ao buscar convidado:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Visualizar detalhes do convidado com QR Code
+  static async getGuestDetails(req, res) {
+    try {
+      const { eventId, guestId } = req.params;
+
+      // Verificar se o evento existe e pertence ao usuário
+      const event = await prisma.event.findFirst({
+        where: {
+          id: eventId,
+          userId: req.user.id
+        }
+      });
+
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          message: 'Evento não encontrado'
+        });
+      }
+
+      // Buscar convidado
+      const guest = await prisma.guest.findFirst({
+        where: {
+          id: guestId,
+          eventId: eventId
+        },
+        include: {
+          checkIns: {
+            orderBy: { checkedInAt: 'desc' }
+          }
+        }
+      });
+
+      if (!guest) {
+        return res.status(404).json({
+          success: false,
+          message: 'Convidado não encontrado'
+        });
+      }
+
+      // Gerar QR Code como data URL
+      const qrCodeDataURL = await QRCode.toDataURL(guest.qrCode, {
+        width: 300,
+        margin: 2
+      });
+
+      // Processar campos personalizados
+      let customFields = {};
+      if (guest.customFields) {
+        try {
+          customFields = typeof guest.customFields === 'string' 
+            ? JSON.parse(guest.customFields) 
+            : guest.customFields;
+        } catch (error) {
+          console.error('Erro ao processar campos personalizados:', error);
+        }
+      }
+
+      // Preparar dados de resposta
+      const guestDetails = {
+        id: guest.id,
+        name: guest.name,
+        email: guest.email,
+        phone: guest.phone,
+        qrCode: guest.qrCode,
+        qrCodeImage: qrCodeDataURL,
+        confirmed: guest.confirmed,
+        confirmedAt: guest.confirmedAt,
+        createdAt: guest.createdAt,
+        customFields: customFields,
+        checkIns: guest.checkIns,
+        event: {
+          id: event.id,
+          name: event.name,
+          date: event.date,
+          location: event.location,
+          formConfig: event.formConfig
+        }
+      };
+
+      res.json({
+        success: true,
+        data: guestDetails
+      });
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do convidado:', error);
       res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'
@@ -835,47 +1086,6 @@ class GuestController {
     }
   }
 
-  // Gerar QR Code
-  static async generateQRCode(req, res) {
-    try {
-      const { qrCode } = req.params;
-
-      const guest = await prisma.guest.findFirst({
-        where: { qrCode }
-      });
-
-      if (!guest) {
-        return res.status(404).json({
-          success: false,
-          message: 'QR Code inválido'
-        });
-      }
-
-      // Gerar QR Code como imagem
-      const qrCodeDataURL = await QRCode.toDataURL(qrCode, {
-        width: 300,
-        margin: 2
-      });
-
-      res.json({
-        success: true,
-        data: {
-          qrCode: qrCodeDataURL,
-          guest: {
-            name: guest.name,
-            eventId: guest.eventId
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao gerar QR Code:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  }
-
   // Inscrição pública
   static async addPublicGuest(req, res) {
     try {
@@ -921,7 +1131,7 @@ class GuestController {
       }
 
       // Gerar QR Code único
-      const qrCode = `GUEST_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const qrCode = await generateSimpleCode(eventId);
 
       // Criar convidado
       const guest = await prisma.guest.create({

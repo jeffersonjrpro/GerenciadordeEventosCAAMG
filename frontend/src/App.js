@@ -12,9 +12,12 @@ import EventDetails from './pages/EventDetails';
 import CreateEvent from './pages/CreateEvent';
 import EditEvent from './pages/EditEvent';
 import Guests from './pages/Guests';
+import GuestDetails from './pages/GuestDetails';
 import CheckIn from './pages/CheckIn';
 import Profile from './pages/Profile';
 import PublicEvent from './pages/PublicEvent';
+import FormBuilderPage from './pages/FormBuilderPage';
+import PublicPageEditorPage from './pages/PublicPageEditorPage';
 
 function App() {
   return (
@@ -53,6 +56,7 @@ function App() {
             <Route path="/event/:eventId" element={<PublicEvent />} />
             <Route path="/event/:eventId/register" element={<PublicEvent />} />
             <Route path="/event/:eventId/formulario" element={<PublicEvent />} />
+            <Route path="/preview/event/:eventId" element={<PublicEvent />} />
             
             {/* Rotas protegidas */}
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
@@ -63,7 +67,10 @@ function App() {
               <Route path="events/:eventId" element={<EventDetails />} />
               <Route path="events/:eventId/edit" element={<EditEvent />} />
               <Route path="events/:eventId/guests" element={<Guests />} />
+              <Route path="events/:eventId/guests/:guestId/details" element={<GuestDetails />} />
               <Route path="events/:eventId/checkin" element={<CheckIn />} />
+              <Route path="events/:eventId/form-builder" element={<FormBuilderPage />} />
+              <Route path="events/:eventId/page-editor" element={<PublicPageEditorPage />} />
               <Route path="profile" element={<Profile />} />
             </Route>
             

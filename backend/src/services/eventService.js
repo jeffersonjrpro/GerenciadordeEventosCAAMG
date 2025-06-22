@@ -15,6 +15,7 @@ class EventService {
         location,
         maxGuests: maxGuests ? parseInt(maxGuests) : null,
         customFields: customFields || {},
+        isPublic: true,
         userId
       },
       include: {
@@ -220,23 +221,24 @@ class EventService {
 
     console.log('EventService.updateEvent - Evento encontrado:', existingEvent.id);
 
-    const { name, description, date, location, maxGuests, isActive, isPublic, customFields } = updateData;
+    const { name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl } = updateData;
 
     console.log('EventService.updateEvent - Dados para atualização:', {
-      name, description, date, location, maxGuests, isActive, isPublic, customFields
+      name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl
     });
 
     const event = await prisma.event.update({
       where: { id: eventId },
       data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(date && { date: new Date(date) }),
-        ...(location && { location }),
-        ...(maxGuests !== undefined && { maxGuests: maxGuests ? parseInt(maxGuests) : null }),
-        ...(isActive !== undefined && { isActive }),
-        ...(isPublic !== undefined && { isPublic }),
-        ...(customFields !== undefined && { customFields })
+        ...(name && { name: name || null }),
+        ...(description !== undefined && { description: description || null }),
+        ...(date && { date: date ? new Date(date) : null }),
+        ...(location && { location: location || null }),
+        ...(maxGuests !== undefined && { maxGuests: maxGuests && maxGuests !== '' ? parseInt(maxGuests) : null }),
+        ...(isActive !== undefined && { isActive: isActive === 'true' || isActive === true }),
+        ...(isPublic !== undefined && { isPublic: isPublic === 'true' || isPublic === true }),
+        ...(customFields !== undefined && { customFields }),
+        ...(imageUrl && { imageUrl: imageUrl || null })
       },
       include: {
         user: {
@@ -364,6 +366,9 @@ class EventService {
         isPublic: true,
         isActive: true,
         customFields: true,
+        formConfig: true,
+        publicPageConfig: true,
+        imageUrl: true,
         user: {
           select: {
             name: true
@@ -379,6 +384,45 @@ class EventService {
 
     if (!event) {
       throw new Error('Evento não encontrado ou não está disponível publicamente');
+    }
+
+    return event;
+  }
+
+  // Obter evento para preview (sem restrições de isActive e isPublic)
+  static async getEventForPreview(eventId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        maxGuests: true,
+        isPublic: true,
+        isActive: true,
+        customFields: true,
+        formConfig: true,
+        publicPageConfig: true,
+        imageUrl: true,
+        user: {
+          select: {
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            guests: true
+          }
+        }
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
     }
 
     return event;
@@ -490,24 +534,402 @@ class EventService {
   // Verificar se inscrições estão pausadas
   static async isRegistrationPaused(eventId) {
     const event = await prisma.event.findUnique({
-      where: { id: eventId }
+      where: { id: eventId },
+      select: {
+        registrationPaused: true,
+        registrationPauseUntil: true
+      }
     });
 
     if (!event) {
       throw new Error('Evento não encontrado');
     }
 
-    // Se pausa manual está ativa
+    // Se pausado manualmente, retorna true
     if (event.registrationPaused) {
       return true;
     }
 
-    // Se há data de pausa e ainda não expirou
-    if (event.registrationPauseUntil && new Date() < event.registrationPauseUntil) {
+    // Se tem data de pausa e ainda não passou, retorna true
+    if (event.registrationPauseUntil && event.registrationPauseUntil > new Date()) {
       return true;
     }
 
     return false;
+  }
+
+  // Obter configuração do formulário
+  static async getFormConfig(eventId, userId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      },
+      select: {
+        id: true,
+        formConfig: true,
+        customFields: true
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    // Se não tem configuração, criar uma padrão
+    if (!event.formConfig) {
+      const defaultConfig = {
+        fields: [
+          {
+            id: 'name',
+            type: 'text',
+            label: 'Nome Completo',
+            required: true,
+            placeholder: 'Digite seu nome completo',
+            order: 1
+          },
+          {
+            id: 'email',
+            type: 'email',
+            label: 'E-mail',
+            required: true,
+            placeholder: 'Digite seu e-mail',
+            order: 2
+          },
+          {
+            id: 'phone',
+            type: 'tel',
+            label: 'Telefone',
+            required: false,
+            placeholder: 'Digite seu telefone',
+            order: 3
+          }
+        ],
+        settings: {
+          title: 'Inscrição no Evento',
+          description: 'Preencha os dados abaixo para se inscrever',
+          submitButtonText: 'Confirmar Inscrição',
+          successMessage: 'Inscrição realizada com sucesso!',
+          showProgressBar: true,
+          allowMultipleSubmissions: false
+        }
+      };
+
+      return defaultConfig;
+    }
+
+    return event.formConfig;
+  }
+
+  // Obter configuração do formulário público (sem autenticação)
+  static async getPublicFormConfig(eventId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        isActive: true,
+        isPublic: true
+      },
+      select: {
+        id: true,
+        formConfig: true,
+        customFields: true
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    // Se não tem configuração, criar uma padrão
+    if (!event.formConfig) {
+      const defaultConfig = {
+        fields: [
+          {
+            id: 'name',
+            type: 'text',
+            label: 'Nome Completo',
+            required: true,
+            placeholder: 'Digite seu nome completo',
+            order: 1
+          },
+          {
+            id: 'email',
+            type: 'email',
+            label: 'E-mail',
+            required: true,
+            placeholder: 'Digite seu e-mail',
+            order: 2
+          },
+          {
+            id: 'phone',
+            type: 'tel',
+            label: 'Telefone',
+            required: false,
+            placeholder: 'Digite seu telefone',
+            order: 3
+          }
+        ],
+        settings: {
+          title: 'Inscrição no Evento',
+          description: 'Preencha os dados abaixo para se inscrever',
+          submitButtonText: 'Confirmar Inscrição',
+          successMessage: 'Inscrição realizada com sucesso!',
+          showProgressBar: true,
+          allowMultipleSubmissions: false
+        }
+      };
+
+      return defaultConfig;
+    }
+
+    return event.formConfig;
+  }
+
+  // Obter configuração do formulário para preview (sem restrições)
+  static async getPublicFormConfigForPreview(eventId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId
+      },
+      select: {
+        id: true,
+        formConfig: true,
+        customFields: true
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    // Se não tem configuração, criar uma padrão
+    if (!event.formConfig) {
+      const defaultConfig = {
+        fields: [
+          {
+            id: 'name',
+            type: 'text',
+            label: 'Nome Completo',
+            required: true,
+            placeholder: 'Digite seu nome completo',
+            order: 1
+          },
+          {
+            id: 'email',
+            type: 'email',
+            label: 'E-mail',
+            required: true,
+            placeholder: 'Digite seu e-mail',
+            order: 2
+          },
+          {
+            id: 'phone',
+            type: 'tel',
+            label: 'Telefone',
+            required: false,
+            placeholder: 'Digite seu telefone',
+            order: 3
+          }
+        ],
+        settings: {
+          title: 'Inscrição no Evento',
+          description: 'Preencha os dados abaixo para se inscrever',
+          submitButtonText: 'Confirmar Inscrição',
+          successMessage: 'Inscrição realizada com sucesso!',
+          showProgressBar: true,
+          allowMultipleSubmissions: false
+        }
+      };
+
+      return defaultConfig;
+    }
+
+    return event.formConfig;
+  }
+
+  // Obter configuração da página pública para preview (sem restrições)
+  static async getPublicPageConfigForPreview(eventId) {
+    console.log('🔍 getPublicPageConfigForPreview - eventId:', eventId);
+    
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        imageUrl: true,
+        publicPageConfig: true
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    console.log('✅ getPublicPageConfigForPreview - evento encontrado:', {
+      id: event.id,
+      name: event.name,
+      imageUrl: event.imageUrl,
+      hasPublicPageConfig: !!event.publicPageConfig
+    });
+
+    // Se não tem configuração, criar uma padrão
+    if (!event.publicPageConfig) {
+      console.log('📝 getPublicPageConfigForPreview - criando configuração padrão');
+      const defaultConfig = {
+        layout: 'modern',
+        theme: {
+          primaryColor: '#3B82F6',
+          secondaryColor: '#1E40AF',
+          backgroundColor: '#FFFFFF',
+          textColor: '#1F2937'
+        },
+        header: {
+          title: event.name,
+          subtitle: event.description || 'Um evento incrível está chegando!',
+          showImage: true,
+          imageUrl: event.imageUrl
+        },
+        content: {
+          showDate: true,
+          showLocation: true,
+          showDescription: true,
+          showOrganizer: true,
+          customText: ''
+        },
+        registration: {
+          showForm: true,
+          buttonText: 'Inscrever-se',
+          formTitle: 'Faça sua inscrição',
+          formDescription: 'Preencha os dados abaixo para participar do evento'
+        },
+        footer: {
+          showSocialLinks: false,
+          customText: '© 2024 Sistema de Eventos'
+        }
+      };
+
+      console.log('✅ getPublicPageConfigForPreview - configuração padrão criada:', defaultConfig);
+      return defaultConfig;
+    }
+
+    console.log('✅ getPublicPageConfigForPreview - retornando configuração existente:', event.publicPageConfig);
+    return event.publicPageConfig;
+  }
+
+  // Atualizar configuração do formulário
+  static async updateFormConfig(eventId, userId, config) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: { formConfig: config }
+    });
+
+    return updatedEvent.formConfig;
+  }
+
+  // Obter configuração da página pública
+  static async getPublicPageConfig(eventId, userId) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        imageUrl: true,
+        publicPageConfig: true
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    // Se não tem configuração, criar uma padrão
+    if (!event.publicPageConfig) {
+      const defaultConfig = {
+        layout: 'modern',
+        theme: {
+          primaryColor: '#3B82F6',
+          secondaryColor: '#1E40AF',
+          backgroundColor: '#FFFFFF',
+          textColor: '#1F2937'
+        },
+        header: {
+          title: event.name,
+          subtitle: event.description || 'Um evento incrível está chegando!',
+          showImage: true,
+          imageUrl: event.imageUrl
+        },
+        content: {
+          showDate: true,
+          showLocation: true,
+          showDescription: true,
+          showOrganizer: true,
+          customText: ''
+        },
+        registration: {
+          showForm: true,
+          buttonText: 'Inscrever-se',
+          formTitle: 'Faça sua inscrição',
+          formDescription: 'Preencha os dados abaixo para participar do evento'
+        },
+        footer: {
+          showSocialLinks: false,
+          customText: '© 2024 Sistema de Eventos'
+        }
+      };
+
+      // Salvar configuração padrão
+      await prisma.event.update({
+        where: { id: eventId },
+        data: { publicPageConfig: defaultConfig }
+      });
+
+      return defaultConfig;
+    }
+
+    return event.publicPageConfig;
+  }
+
+  // Atualizar configuração da página pública
+  static async updatePublicPageConfig(eventId, userId, config) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        userId
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: { publicPageConfig: config }
+    });
+
+    return updatedEvent.publicPageConfig;
   }
 }
 

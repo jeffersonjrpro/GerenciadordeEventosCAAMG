@@ -211,6 +211,12 @@ Criei um sistema completo de gerenciamento de eventos com confirmação de prese
 - ✅ Design moderno
 - ✅ Documentação completa
 
+### ✨ Novas Funcionalidades (Junho/2025)
+- ✅ **Editor de Texto Rico**: Implementado o editor **React-Quill** para o campo de **descrição** na criação/edição de eventos.
+- ✅ **Renderização de HTML**: O conteúdo formatado da descrição é renderizado de forma segura e estilizada na página pública do evento, utilizando o plugin `@tailwindcss/typography`.
+- ✅ **Novo Layout de Cabeçalho**: A página pública do evento foi redesenhada, apresentando um layout moderno com informações à esquerda e imagem à direita.
+- ✅ **Gerenciamento de Imagem do Evento**: Adicionada funcionalidade completa de upload, preview e remoção da imagem principal do evento.
+
 ---
 
 **🎉 Sistema 100% funcional e pronto para uso em produção!** 

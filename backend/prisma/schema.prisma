@@ -38,6 +38,8 @@ model Event {
   registrationPaused Boolean @default(false)  // Pausar inscrições manualmente
   registrationPauseUntil DateTime?  // Pausar inscrições até uma data específica
   customFields Json?   // Campos personalizados do evento
+  formConfig  Json?    // Configuração do formulário de inscrição
+  publicPageConfig Json? // Configuração da página pública do evento
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

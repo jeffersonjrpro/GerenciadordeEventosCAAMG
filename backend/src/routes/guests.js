@@ -51,4 +51,7 @@ router.get('/events/:eventId/guests/export', guestController.exportGuests);
 // Buscar convidado específico
 router.get('/events/:eventId/guests/:guestId', guestController.getGuestById);
 
+// Visualizar detalhes do convidado com QR Code
+router.get('/events/:eventId/guests/:guestId/details', guestController.getGuestDetails);
+
 module.exports = router; 
