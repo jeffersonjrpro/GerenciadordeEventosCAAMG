@@ -3,6 +3,7 @@ const router = express.Router();
 const EventController = require('../controllers/eventController');
 const GuestController = require('../controllers/guestController');
 const { authenticateToken, requireAdmin, requireOrganizer } = require('../middleware/auth');
+const { isEventOwner, isEventEditor, canCheckIn } = require('../middleware/organizerAuth');
 const { uploadEventImage, handleUploadError } = require('../middleware/upload');
 const multer = require('multer');
 
@@ -36,35 +37,35 @@ router.post('/', uploadEventImage, handleUploadError, EventController.createEven
 router.get('/my-events', EventController.getUserEvents);
 router.get('/stats', EventController.getUserStats);
 router.get('/:eventId', EventController.getEventById);
-router.put('/:eventId', uploadEventImage, handleUploadError, EventController.eventValidation, EventController.updateEvent);
-router.put('/:eventId/custom-fields', EventController.customFieldsValidation, EventController.updateEvent);
-router.delete('/:eventId', EventController.deleteEvent);
+router.put('/:eventId', isEventEditor, uploadEventImage, handleUploadError, EventController.eventValidation, EventController.updateEvent);
+router.put('/:eventId/custom-fields', isEventEditor, EventController.customFieldsValidation, EventController.updateEvent);
+router.delete('/:eventId', isEventOwner, EventController.deleteEvent);
 router.get('/:eventId/stats', EventController.getEventStats);
 
 // Controle de inscrições
-router.post('/:eventId/pause-registration', EventController.pauseRegistration);
-router.post('/:eventId/resume-registration', EventController.resumeRegistration);
+router.post('/:eventId/pause-registration', isEventEditor, EventController.pauseRegistration);
+router.post('/:eventId/resume-registration', isEventEditor, EventController.resumeRegistration);
 router.get('/:eventId/registration-status', EventController.getRegistrationStatus);
 
 // Configuração do formulário
 router.get('/:eventId/form-config', EventController.getFormConfig);
-router.put('/:eventId/form-config', EventController.updateFormConfig);
+router.put('/:eventId/form-config', isEventEditor, EventController.updateFormConfig);
 
 // Configuração da página pública
 router.get('/:eventId/public-page-config', EventController.getPublicPageConfig);
-router.put('/:eventId/public-page-config', EventController.updatePublicPageConfig);
+router.put('/:eventId/public-page-config', isEventEditor, EventController.updatePublicPageConfig);
 
 // Upload e remoção de imagem
-router.post('/:eventId/image', uploadEventImage, handleUploadError, EventController.uploadEventImage);
-router.delete('/:eventId/image', EventController.removeEventImage);
+router.post('/:eventId/image', isEventEditor, uploadEventImage, handleUploadError, EventController.uploadEventImage);
+router.delete('/:eventId/image', isEventEditor, EventController.removeEventImage);
 
 // Rotas de convidados
 router.get('/:eventId/guests', GuestController.getGuestsByEvent);
-router.post('/:eventId/guests', GuestController.guestValidation, GuestController.createGuest);
-router.put('/:eventId/guests/:guestId', GuestController.guestValidation, GuestController.updateGuest);
-router.delete('/:eventId/guests/:guestId', GuestController.deleteGuest);
-router.put('/:eventId/guests/:guestId/confirm', GuestController.confirmGuest);
-router.post('/:eventId/guests/import', csvUpload.single('file'), GuestController.importGuests);
+router.post('/:eventId/guests', isEventEditor, GuestController.guestValidation, GuestController.createGuest);
+router.put('/:eventId/guests/:guestId', isEventEditor, GuestController.guestValidation, GuestController.updateGuest);
+router.delete('/:eventId/guests/:guestId', isEventEditor, GuestController.deleteGuest);
+router.put('/:eventId/guests/:guestId/confirm', isEventEditor, GuestController.confirmGuest);
+router.post('/:eventId/guests/import', isEventEditor, csvUpload.single('file'), GuestController.importGuests);
 router.get('/:eventId/guests/export', GuestController.exportGuests);
 router.get('/:eventId/guests/:guestId', GuestController.getGuestById);
 

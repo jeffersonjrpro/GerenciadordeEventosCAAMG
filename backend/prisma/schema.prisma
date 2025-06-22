@@ -10,6 +10,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  users  User[]
+  events Event[]
+
+  @@map("companies")
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -20,7 +33,17 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relacionamentos
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  
+  // Eventos criados pelo usuário (mantém compatibilidade)
   events Event[]
+  
+  // Organizadores de eventos
+  eventOrganizers EventOrganizer[]
+  
+  // Convites enviados
+  sentInvites TeamInvite[]
 
   @@map("users")
 }
@@ -44,12 +67,60 @@ model Event {
   updatedAt   DateTime @updatedAt
 
   // Relacionamentos
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  
+  // Criador do evento (mantém compatibilidade)
   userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Organizadores do evento
+  organizers EventOrganizer[]
+  
+  // Convites da equipe
+  teamInvites TeamInvite[]
+  
   guests    Guest[]
   checkIns  CheckIn[]
+  subEventos SubEvento[]
 
   @@map("events")
+}
+
+model EventOrganizer {
+  id        String   @id @default(cuid())
+  role      OrganizerRole @default(EDITOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  eventId  String
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_organizers")
+}
+
+model TeamInvite {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  role      OrganizerRole @default(EDITOR)
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  eventId String
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  invitedById String
+  invitedBy   User     @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@map("team_invites")
 }
 
 model Guest {
@@ -68,6 +139,7 @@ model Guest {
   eventId   String
   event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   checkIns  CheckIn[]
+  consumos  Consumo[]
 
   @@map("guests")
 }
@@ -86,7 +158,52 @@ model CheckIn {
   @@map("check_ins")
 }
 
+model SubEvento {
+  id            String   @id @default(cuid())
+  nome          String
+  descricao     String?
+  dataHora      DateTime
+  local         String?
+  limitePorConvidado Int @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacionamentos
+  eventoId      String
+  evento        Event     @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  consumos      Consumo[]
+
+  @@map("sub_eventos")
+}
+
+model Consumo {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @default(now())
+
+  // Relacionamentos
+  convidadoId   String
+  convidado     Guest     @relation(fields: [convidadoId], references: [id], onDelete: Cascade)
+  subEventoId   String
+  subEvento     SubEvento @relation(fields: [subEventoId], references: [id], onDelete: Cascade)
+
+  @@unique([convidadoId, subEventoId])
+  @@map("consumos")
+}
+
 enum UserRole {
   ADMIN
   ORGANIZER
+}
+
+enum OrganizerRole {
+  OWNER    // Dono do evento (pode fazer tudo)
+  EDITOR   // Editor (pode criar, editar, fazer check-in)
+  CHECKIN  // Apenas check-in
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 } 

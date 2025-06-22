@@ -18,6 +18,8 @@ import Profile from './pages/Profile';
 import PublicEvent from './pages/PublicEvent';
 import FormBuilderPage from './pages/FormBuilderPage';
 import PublicPageEditorPage from './pages/PublicPageEditorPage';
+import InviteAccept from './pages/InviteAccept';
+import SubEventosPage from './pages/SubEventosPage';
 
 function App() {
   return (
@@ -58,6 +60,9 @@ function App() {
             <Route path="/event/:eventId/formulario" element={<PublicEvent />} />
             <Route path="/preview/event/:eventId" element={<PublicEvent />} />
             
+            {/* Rota de convite (pública mas pode requerer login) */}
+            <Route path="/convite/:token" element={<InviteAccept />} />
+            
             {/* Rotas protegidas */}
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
@@ -69,6 +74,7 @@ function App() {
               <Route path="events/:eventId/guests" element={<Guests />} />
               <Route path="events/:eventId/guests/:guestId/details" element={<GuestDetails />} />
               <Route path="events/:eventId/checkin" element={<CheckIn />} />
+              <Route path="events/:eventId/subeventos" element={<SubEventosPage />} />
               <Route path="events/:eventId/form-builder" element={<FormBuilderPage />} />
               <Route path="events/:eventId/page-editor" element={<PublicPageEditorPage />} />
               <Route path="profile" element={<Profile />} />

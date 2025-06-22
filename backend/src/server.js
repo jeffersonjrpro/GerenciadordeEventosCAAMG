@@ -11,6 +11,8 @@ const eventRoutes = require('./routes/events');
 const checkInRoutes = require('./routes/checkin');
 const publicRoutes = require('./routes/public');
 const guestRoutes = require('./routes/guests');
+const organizerRoutes = require('./routes/organizers');
+const subEventoRoutes = require('./routes/subeventos');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +66,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/checkin', checkInRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/guests', guestRoutes);
+app.use('/api/organizers', organizerRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
@@ -73,6 +76,8 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV 
   });
 });
+
+app.use('/api', subEventoRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {

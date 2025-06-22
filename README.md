@@ -34,6 +34,40 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - ✅ **Página de detalhes do convidado** com QR Code, status e histórico
 - ✅ **Download de QR Code** com configuração de segurança CSP
 - ✅ **Listagem de convidados** com campos personalizados e códigos QR
+- ✅ **🎯 Sistema de SubEventos com Controle de Consumo**
+- ✅ **📊 Relatórios Detalhados de Consumo**
+- ✅ **🔒 Validação de Acesso por QR Code**
+- ✅ **📈 Estatísticas em Tempo Real**
+- ✅ **📋 Exportação de Relatórios em CSV**
+- ✅ **🎫 Controle de Limite por Convidado**
+- ✅ **🔍 Validação de Acesso com Feedback Visual**
+- ✅ **📱 Interface Moderna para Gerenciamento**
+
+## 🎯 Sistema de SubEventos
+
+O sistema agora inclui um módulo completo de **SubEventos** que permite:
+
+### **Funcionalidades Principais:**
+- **Criação de SubEventos** dentro de eventos principais (ex: Almoço, Jantar, Coffee Break)
+- **Controle de Consumo** via QR Code com limite por convidado
+- **Validação de Acesso** em tempo real com feedback visual
+- **Relatórios Detalhados** com estatísticas completas
+- **Exportação de Dados** em formato CSV
+- **Interface Moderna** com abas para gerenciamento e relatórios
+
+### **Como Funciona:**
+1. **Criar SubEvento**: Defina nome, data/hora, local e limite por convidado
+2. **Validar Acesso**: Use QR Code do convidado para verificar acesso
+3. **Controle Automático**: Sistema bloqueia quando limite é atingido
+4. **Relatórios**: Visualize consumos, convidados sem consumo e estatísticas
+5. **Exportação**: Baixe relatórios completos em CSV
+
+### **Exemplo de Uso:**
+- **Evento Principal**: Congresso Anual
+- **SubEventos**: 
+  - Almoço (limite: 1 por convidado)
+  - Jantar (limite: 1 por convidado)
+  - Coffee Break (limite: 2 por convidado)
 
 ## 🛠️ Tecnologias
 
@@ -349,6 +383,96 @@ npm run dev
 - **Exportação Completa**: Inclui campos personalizados no CSV
 - **Importação Inteligente**: Suporte a campos personalizados via CSV
 
+## 🎯 Sistema de SubEventos - Guia Completo
+
+### **Visão Geral**
+O sistema de SubEventos permite criar eventos menores dentro de um evento principal, com controle de consumo via QR Code. Ideal para congressos, workshops e eventos que possuem múltiplas atividades.
+
+### **Funcionalidades do Sistema**
+
+#### **1. Gerenciamento de SubEventos**
+- **Criar SubEvento**: Nome, descrição, data/hora, local
+- **Limite por Convidado**: Define quantas vezes cada convidado pode consumir
+- **Editar/Excluir**: Gerenciamento completo dos subeventos
+- **Interface Moderna**: Abas organizadas para melhor usabilidade
+
+#### **2. Validação de Acesso**
+- **QR Code Scanner**: Leitura do QR Code do convidado
+- **Validação em Tempo Real**: Verifica se o convidado pode consumir
+- **Feedback Visual**: Mensagens claras de sucesso ou erro
+- **Controle de Limite**: Bloqueia automaticamente quando limite é atingido
+
+#### **3. Relatórios Detalhados**
+- **Estatísticas Gerais**: Total de consumos por subevento
+- **Convidados com Consumo**: Lista completa com data/hora
+- **Convidados sem Consumo**: Identifica quem ainda não consumiu
+- **Exportação CSV**: Download de relatórios completos
+
+#### **4. Interface de Usuário**
+- **Dashboard com Cards**: Visão geral de todos os subeventos
+- **Abas Organizadas**: Separação entre gerenciamento e relatórios
+- **Botão de Voltar**: Navegação intuitiva para o evento principal
+- **Design Responsivo**: Funciona em desktop e mobile
+
+### **Como Usar o Sistema**
+
+#### **Passo 1: Criar SubEvento**
+1. Acesse a página de detalhes do evento
+2. Clique em "SubEventos" no menu lateral
+3. Clique em "Criar SubEvento"
+4. Preencha:
+   - **Nome**: Ex: "Almoço", "Coffee Break"
+   - **Descrição**: Detalhes do subevento
+   - **Data/Hora**: Quando acontecerá
+   - **Local**: Onde acontecerá
+   - **Limite por Convidado**: Quantas vezes pode consumir
+
+#### **Passo 2: Validar Acesso**
+1. Na aba "Gerenciar SubEventos"
+2. Clique em "Validar Acesso" no subevento desejado
+3. Use o scanner de QR Code ou digite o código manual
+4. Sistema valida e registra o consumo automaticamente
+
+#### **Passo 3: Visualizar Relatórios**
+1. Na aba "Relatórios"
+2. Veja estatísticas gerais de todos os subeventos
+3. Clique em "Ver Detalhes" para relatório específico
+4. Use as abas "Com Consumo" e "Sem Consumo"
+5. Exporte dados em CSV se necessário
+
+### **Exemplos de Uso**
+
+#### **Congressos e Seminários**
+- **Evento Principal**: Congresso de Tecnologia 2024
+- **SubEventos**:
+  - Almoço (limite: 1 por convidado)
+  - Coffee Break Manhã (limite: 1 por convidado)
+  - Coffee Break Tarde (limite: 1 por convidado)
+  - Jantar de Confraternização (limite: 1 por convidado)
+
+#### **Workshops e Treinamentos**
+- **Evento Principal**: Workshop de Marketing Digital
+- **SubEventos**:
+  - Material Didático (limite: 1 por convidado)
+  - Certificado (limite: 1 por convidado)
+  - Coffee Break (limite: 2 por convidado)
+
+#### **Eventos Corporativos**
+- **Evento Principal**: Reunião Anual da Empresa
+- **SubEventos**:
+  - Brunch (limite: 1 por convidado)
+  - Almoço Executivo (limite: 1 por convidado)
+  - Kit de Material (limite: 1 por convidado)
+
+### **Benefícios do Sistema**
+- **Controle Preciso**: Evita desperdícios e garante justiça
+- **Relatórios Detalhados**: Acompanhamento completo do consumo
+- **Facilidade de Uso**: Interface intuitiva para organizadores
+- **Flexibilidade**: Adaptável a diferentes tipos de eventos
+- **Automação**: Reduz trabalho manual e erros humanos
+
+## 🎨 Novas Funcionalidades
+
 ## 🎯 Estrutura do Projeto
 
 ```
@@ -356,27 +480,44 @@ GerenciadordeEventosCAAMG/
 ├── backend/                    # API REST
 │   ├── src/
 │   │   ├── controllers/        # Controladores
+│   │   │   ├── subEventoController.js # Controlador de SubEventos
+│   │   │   └── ...
 │   │   ├── routes/            # Rotas da API
+│   │   │   ├── subeventos.js  # Rotas de SubEventos
+│   │   │   └── ...
 │   │   ├── services/          # Lógica de negócio
+│   │   │   ├── subEventoService.js # Serviço de SubEventos
+│   │   │   └── ...
 │   │   ├── middleware/        # Middlewares
 │   │   └── config/            # Configurações
 │   ├── prisma/                # Schema e migrações
+│   │   ├── migrations/        # Migrações do banco
+│   │   │   ├── 20250622190043_add_sub_eventos/ # Migração SubEventos
+│   │   │   └── ...
+│   │   └── schema.prisma      # Schema com modelos SubEvento e Consumo
 │   ├── uploads/               # Arquivos enviados
 │   └── temp/                  # Arquivos temporários
 ├── frontend/                   # React SPA
 │   ├── src/
 │   │   ├── components/        # Componentes reutilizáveis
+│   │   │   ├── SubEventosManager.js # Gerenciador de SubEventos
+│   │   │   ├── RelatorioConsumo.js # Relatórios de Consumo
+│   │   │   ├── QRCodeScanner.js # Scanner de QR Code
 │   │   │   ├── FormBuilder.js # Construtor de formulários
 │   │   │   ├── FormField.js   # Campo de formulário
 │   │   │   ├── FormPreview.js # Visualização de formulário
 │   │   │   ├── FormSettings.js # Configurações de formulário
 │   │   │   └── PublicPageEditor.js # Editor de página pública
 │   │   ├── pages/             # Páginas da aplicação
+│   │   │   ├── SubEventosPage.js # Página de SubEventos
+│   │   │   └── ...
 │   │   ├── contexts/          # Contextos React
 │   │   ├── services/          # Serviços de API
 │   │   └── hooks/             # Hooks customizados
 │   └── public/                # Arquivos públicos
 ├── docs/                       # Documentação
+│   ├── SUBEVENTOS_GUIDE.md    # Guia de SubEventos
+│   └── ...
 └── scripts/                    # Scripts de automação
 ```
 

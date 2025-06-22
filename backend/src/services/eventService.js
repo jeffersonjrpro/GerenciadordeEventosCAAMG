@@ -1,11 +1,12 @@
 const { prisma } = require('../config/database');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
+const OrganizerService = require('./organizerService');
 
 class EventService {
   // Criar novo evento
   static async createEvent(userId, eventData) {
-    const { name, description, date, location, maxGuests, customFields } = eventData;
+    const { name, description, date, location, maxGuests, customFields, companyId } = eventData;
 
     const event = await prisma.event.create({
       data: {
@@ -16,7 +17,8 @@ class EventService {
         maxGuests: maxGuests ? parseInt(maxGuests) : null,
         customFields: customFields || {},
         isPublic: true,
-        userId
+        userId,
+        companyId
       },
       include: {
         user: {
@@ -24,6 +26,17 @@ class EventService {
             id: true,
             name: true,
             email: true
+          }
+        },
+        organizers: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
           }
         },
         _count: {
@@ -35,6 +48,9 @@ class EventService {
       }
     });
 
+    // Adicionar o criador como organizador OWNER
+    await OrganizerService.addOrganizer(event.id, userId, 'OWNER');
+
     return event;
   }
 
@@ -44,17 +60,37 @@ class EventService {
     
     // Se userId fornecido, verificar se o usuário tem acesso ao evento
     if (userId) {
-      where.userId = userId;
+      // Verificar se é o criador ou organizador do evento
+      const isCreator = await prisma.event.findFirst({
+        where: { id: eventId, userId }
+      });
+      
+      const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
+      
+      if (!isCreator && !isOrganizer) {
+        throw new Error('Sem permissão para acessar este evento');
+      }
     }
 
     const event = await prisma.event.findFirst({
-      where,
+      where: { id: eventId },
       include: {
         user: {
           select: {
             id: true,
             name: true,
             email: true
+          }
+        },
+        organizers: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
           }
         },
         guests: {
@@ -95,13 +131,16 @@ class EventService {
     return event;
   }
 
-  // Listar eventos do usuário
+  // Listar eventos do usuário (incluindo onde é organizador)
   static async getUserEvents(userId, filters = {}) {
     const { page = 1, limit = 10, search = '', status = 'all' } = filters;
     const skip = (page - 1) * limit;
 
     const where = {
-      userId,
+      OR: [
+        { userId }, // Eventos criados pelo usuário
+        { organizers: { some: { userId } } } // Eventos onde é organizador
+      ],
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
@@ -117,6 +156,91 @@ class EventService {
       prisma.event.findMany({
         where,
         include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          organizers: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          },
+          _count: {
+            select: {
+              guests: true,
+              checkIns: true
+            }
+          }
+        },
+        orderBy: {
+          date: 'desc'
+        },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.event.count({ where })
+    ]);
+
+    return {
+      events,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  // Listar eventos da empresa
+  static async getCompanyEvents(companyId, filters = {}) {
+    const { page = 1, limit = 10, search = '', status = 'all' } = filters;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      companyId,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { location: { contains: search, mode: 'insensitive' } }
+        ]
+      }),
+      ...(status === 'active' && { isActive: true }),
+      ...(status === 'inactive' && { isActive: false })
+    };
+
+    const [events, total] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          organizers: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          },
           _count: {
             select: {
               guests: true,

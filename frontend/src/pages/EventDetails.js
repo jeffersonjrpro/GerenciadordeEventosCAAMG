@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
+import EventTeam from '../components/EventTeam';
 import {
   Calendar,
   MapPin,
@@ -488,6 +489,9 @@ const EventDetails = () => {
               )}
             </div>
           </div>
+
+          {/* Equipe do Evento */}
+          <EventTeam eventId={eventId} />
         </div>
 
         {/* Sidebar */}
@@ -550,6 +554,14 @@ const EventDetails = () => {
               >
                 <QrCode className="h-4 w-4 mr-2" />
                 Check-in
+              </Link>
+              
+              <Link
+                to={`/events/${eventId}/subeventos`}
+                className="btn-outline w-full inline-flex items-center justify-center"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                SubEventos
               </Link>
               
               <Link

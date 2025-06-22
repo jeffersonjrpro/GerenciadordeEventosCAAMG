@@ -1,5 +1,6 @@
 const { body, validationResult } = require('express-validator');
 const EventService = require('../services/eventService');
+const OrganizerService = require('../services/organizerService');
 
 class EventController {
   // Validações para criação de evento (campos obrigatórios)
@@ -289,6 +290,15 @@ class EventController {
 
       const { eventId } = req.params;
       const updateData = req.body;
+      const userId = req.user.id;
+      
+      // Verificar se o usuário tem permissão para editar o evento
+      const hasPermission = await OrganizerService.hasPermission(eventId, userId, 'EDITOR');
+      if (!hasPermission) {
+        return res.status(403).json({
+          error: 'Sem permissão para editar este evento'
+        });
+      }
       
       if (req.file) {
         updateData.imageUrl = `/uploads/events/${req.file.filename}`;
@@ -297,7 +307,7 @@ class EventController {
 
       console.log('🔍 UpdateEvent - Dados para atualização:', updateData);
       
-      const event = await EventService.updateEvent(eventId, req.user.id, updateData);
+      const event = await EventService.updateEvent(eventId, userId, updateData);
 
       console.log('✅ UpdateEvent - Evento atualizado com sucesso');
       res.json({
@@ -325,7 +335,17 @@ class EventController {
   static async deleteEvent(req, res) {
     try {
       const { eventId } = req.params;
-      const result = await EventService.deleteEvent(eventId, req.user.id);
+      const userId = req.user.id;
+
+      // Verificar se o usuário tem permissão para deletar o evento (apenas OWNER)
+      const hasPermission = await OrganizerService.hasPermission(eventId, userId, 'OWNER');
+      if (!hasPermission) {
+        return res.status(403).json({
+          error: 'Sem permissão para deletar este evento'
+        });
+      }
+
+      const result = await EventService.deleteEvent(eventId, userId);
 
       res.json({
         message: result.message
@@ -349,7 +369,17 @@ class EventController {
   static async getEventStats(req, res) {
     try {
       const { eventId } = req.params;
-      const stats = await EventService.getEventStats(eventId, req.user.id);
+      const userId = req.user.id;
+
+      // Verificar se o usuário tem acesso ao evento
+      const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
+      if (!isOrganizer) {
+        return res.status(403).json({
+          error: 'Sem permissão para acessar este evento'
+        });
+      }
+
+      const stats = await EventService.getEventStats(eventId, userId);
 
       res.json({
         data: stats
