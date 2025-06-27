@@ -1,9 +1,48 @@
-# 🎉 Gerenciador de Eventos - Sistema QR Code
+# 🎉 Gerenciador de Eventos - Sistema SaaS QR Code
 
-Sistema completo de gerenciamento de eventos com confirmação de presença via QR Code, desenvolvido para o CAAMG.
+Sistema completo de gerenciamento de eventos com confirmação de presença via QR Code, desenvolvido como plataforma SaaS com suporte a múltiplas empresas e organizadores.
 
 ## 🚀 Funcionalidades
 
+### 🏢 Sistema SaaS Multi-Empresa
+- ✅ **Painel Administrativo Master** - Gestão centralizada de empresas
+- ✅ **Sistema de Planos e Faturas** - Controle de assinaturas
+- ✅ **Gestão de Empresas** - Criação, edição e bloqueio de empresas
+- ✅ **Dashboard Master** - Indicadores de alto nível e métricas
+- ✅ **Controle de Acessos** - Níveis de permissão para administradores
+- ✅ **Logs de Ações** - Auditoria completa de operações
+
+### 💳 Sistema de Planos e Faturas
+- ✅ **Visualização do Plano Atual** - Detalhes completos do plano contratado
+- ✅ **Histórico de Faturas** - Listagem de todas as faturas com status
+- ✅ **Pagamento de Faturas** - Processamento de pagamentos pendentes
+- ✅ **Download de Faturas** - Baixar faturas em formato PDF
+- ✅ **Resumo Financeiro** - Totais por status (Pago, Pendente, Vencido)
+- ✅ **Status de Faturas** - Pago, Pendente, Vencida com indicadores visuais
+- ✅ **Interface Moderna** - Cards coloridos e gráficos de resumo
+
+### 👥 Sistema de Gerenciamento de Equipe
+- ✅ **Gestão Completa de Usuários** - Adicionar, editar, remover membros
+- ✅ **Níveis de Acesso Configuráveis:**
+  - **Check-in**: Apenas fazer check-in nos eventos
+  - **Editor**: Editor de página + check-in
+  - **Administrador**: Acesso total à empresa
+- ✅ **Controle de Acesso a Eventos:**
+  - Trabalhar em todos os eventos da empresa
+  - Trabalhar apenas em eventos específicos
+- ✅ **Filtros Avançados** - Por nome, email, nível e status
+- ✅ **Modais Interativos** - Criação, edição e visualização de usuários
+- ✅ **Validações de Permissão** - Controle de acesso por nível
+- ✅ **Geração Automática de Senhas** - Senhas temporárias para novos usuários
+
+### 👥 Sistema de Organizadores
+- ✅ **Múltiplos Organizadores por Evento** - Compartilhamento de eventos
+- ✅ **Convites para Organizadores** - Sistema de convites por email
+- ✅ **Controle de Permissões** - Diferentes níveis de acesso
+- ✅ **Gestão de Equipe** - Adicionar/remover organizadores
+- ✅ **Notificações de Convite** - Sistema de aceitação/rejeição
+
+### 🎯 Funcionalidades de Eventos
 - ✅ CRUD completo de usuários e eventos
 - ✅ Sistema de convites com QR Code único
 - ✅ Check-in via leitura de QR Code e código manual
@@ -43,9 +82,144 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - ✅ **🔍 Validação de Acesso com Feedback Visual**
 - ✅ **📱 Interface Moderna para Gerenciamento**
 
+## 🏢 Sistema SaaS - Estrutura Multi-Empresa
+
+### **Painel Administrativo Master**
+O sistema agora inclui um painel administrativo completo para gestão de múltiplas empresas:
+
+#### **📊 Dashboard Master**
+- **Indicadores de Alto Nível:**
+  - Total de empresas ativas
+  - Total de usuários ativos
+  - Eventos criados no mês
+  - Faturas pendentes e pagas
+  - Receita total por mês
+  - Empresas bloqueadas
+  - Faturas em atraso
+- **Gráficos de Crescimento:**
+  - Crescimento de empresas por mês
+  - Receita mensal
+  - Uso de recursos por empresa
+
+#### **🏢 Gestão de Empresas**
+- **Listagem de Empresas:**
+  - Nome, email, plano, status
+  - Data de criação
+  - Ações: Ver, Editar, Bloquear
+- **Funcionalidades:**
+  - Criar nova empresa manualmente
+  - Editar dados (nome, email, plano)
+  - Mudar plano de assinatura
+  - Bloquear/desbloquear empresa
+  - Ver histórico de uso (eventos, convidados)
+
+#### **💳 Gestão de Planos e Faturas**
+- **Planos:**
+  - Criar e editar planos
+  - Definir limites (eventos, convidados)
+  - Configurar preços mensais
+  - Associar planos a empresas
+- **Faturas:**
+  - Listar faturas por empresa
+  - Status (PAGO / PENDENTE / VENCIDA)
+  - Criar faturas manuais
+  - Marcar como pagas
+  - Download de faturas
+  - Integração futura com gateways de pagamento
+
+#### **🔐 Controle de Acessos**
+- **Administradores Master:**
+  - Criar contas de administradores
+  - Níveis de acesso (admin master / suporte / leitura)
+  - Logs de ações completos
+  - Auditoria de operações
+
+## 💳 Sistema de Planos e Faturas
+
+### **Funcionalidades para Usuários:**
+- **Visualização do Plano:**
+  - Detalhes completos do plano atual
+  - Limites de eventos e convidados
+  - Preço mensal e descrição
+  - Opção para alterar plano
+- **Gestão de Faturas:**
+  - Histórico completo de faturas
+  - Status visual (Pago, Pendente, Vencida)
+  - Pagamento de faturas pendentes
+  - Download de faturas
+  - Resumo financeiro por status
+- **Interface Moderna:**
+  - Cards coloridos para diferentes status
+  - Gráficos de resumo financeiro
+  - Filtros e busca
+  - Notificações de sucesso/erro
+
+### **Como Funciona:**
+1. **Visualizar Plano**: Usuário vê detalhes do plano contratado
+2. **Acompanhar Faturas**: Lista de todas as faturas com status
+3. **Pagar Faturas**: Processamento de pagamentos pendentes
+4. **Download**: Baixar faturas para arquivo
+5. **Resumo**: Visualizar totais por status
+
+## 👥 Sistema de Gerenciamento de Equipe
+
+### **Funcionalidades Principais:**
+- **Gestão de Usuários:**
+  - Adicionar novos membros à equipe
+  - Editar informações dos usuários
+  - Remover usuários da equipe
+  - Visualizar detalhes completos
+- **Níveis de Acesso:**
+  - **Check-in**: Apenas fazer check-in nos eventos
+  - **Editor**: Editor de página + check-in
+  - **Administrador**: Acesso total à empresa
+- **Controle de Eventos:**
+  - Trabalhar em todos os eventos da empresa
+  - Trabalhar apenas em eventos específicos
+  - Seleção múltipla de eventos
+- **Filtros e Busca:**
+  - Filtrar por nome, email, nível e status
+  - Busca em tempo real
+  - Limpar filtros
+- **Segurança:**
+  - Validações de permissão
+  - Geração automática de senhas
+  - Soft delete para remoção
+  - Logs de ações
+
+### **Como Funciona:**
+1. **Adicionar Usuário**: Preencher dados e definir nível de acesso
+2. **Configurar Eventos**: Escolher eventos específicos ou todos
+3. **Geração de Senha**: Sistema gera senha temporária
+4. **Notificação**: Usuário recebe email com credenciais
+5. **Gestão**: Editar, remover ou visualizar usuários
+
+## 👥 Sistema de Organizadores Multiplos
+
+### **Funcionalidades Principais:**
+- **Convites para Organizadores:**
+  - Envio de convites por email
+  - Sistema de aceitação/rejeição
+  - Notificações automáticas
+- **Gestão de Equipe:**
+  - Adicionar/remover organizadores
+  - Definir níveis de permissão
+  - Visualizar organizadores ativos
+- **Controle de Acesso:**
+  - Diferentes níveis de permissão
+  - Acesso compartilhado a eventos
+  - Logs de atividades
+
+### **Como Funciona:**
+1. **Criar Evento**: O criador principal define o evento
+2. **Convidar Organizadores**: Envia convites por email
+3. **Aceitar Convite**: Organizadores aceitam via link
+4. **Colaboração**: Múltiplos organizadores trabalham no mesmo evento
+5. **Controle**: Criador principal mantém controle total
+
 ## 🎯 Sistema de SubEventos
 
-O sistema agora inclui um módulo completo de **SubEventos** que permite:
+O sistema inclui um módulo completo de **SubEventos** que permite:
 
 ### **Funcionalidades Principais:**
 - **Criação de SubEventos** dentro de eventos principais (ex: Almoço, Jantar, Coffee Break)
@@ -90,6 +264,7 @@ O sistema agora inclui um módulo completo de **SubEventos** que permite:
 - **React Hook Form** + Yup validation
 - **Axios** para requisições HTTP
 - **React Icons** + **Lucide React**
+- **@heroicons/react** (ícones modernos para dashboards)
 - **React Hot Toast** para notificações
 - **@dnd-kit** para drag & drop
 - **React Colorful** para seleção de cores
@@ -102,6 +277,7 @@ O sistema agora inclui um módulo completo de **SubEventos** que permite:
 - **PostgreSQL 12+**
 - **npm** ou **yarn**
 - **Git**
+- **@heroicons/react** (instale com `npm install @heroicons/react` no frontend)
 
 ### 1. Clone o repositório
 ```bash
@@ -471,7 +647,15 @@ O sistema de SubEventos permite criar eventos menores dentro de um evento princi
 - **Flexibilidade**: Adaptável a diferentes tipos de eventos
 - **Automação**: Reduz trabalho manual e erros humanos
 
-## 🎨 Novas Funcionalidades
+## 🚀 Novidades e Melhorias Recentes
+
+- Inclusão e edição de convidados com campos personalizados dinâmicos e QR Code gerado automaticamente
+- Formulário de convidados moderno, responsivo e com opção de download do QR Code
+- Construtor de formulários drag & drop com edição fluida do rótulo (label) dos campos
+- Campos personalizados criados no evento aparecem imediatamente ao adicionar/editar convidados
+- Correções de UX: edição de campos, seleção de campo, responsividade e feedback visual
+- Separação clara da edição de senha no perfil do usuário
+- Robustez e responsividade aprimoradas em todas as telas
 
 ## 🎯 Estrutura do Projeto
 

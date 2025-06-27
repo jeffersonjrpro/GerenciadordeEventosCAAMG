@@ -35,7 +35,7 @@ const FormBuilder = ({ eventId, onSave }) => {
     }
   });
   const [activeTab, setActiveTab] = useState('builder');
-  const [selectedField, setSelectedField] = useState(null);
+  const [selectedFieldId, setSelectedFieldId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const sensors = useSensors(
@@ -92,18 +92,19 @@ const FormBuilder = ({ eventId, onSave }) => {
       order: config.fields.length + 1
     };
 
-    setConfig(prev => ({
-      ...prev,
-      fields: [...prev.fields, newField]
-    }));
-
-    setSelectedField(newField);
+    setConfig(prev => {
+      const updatedFields = [...prev.fields, newField];
+      return { ...prev, fields: updatedFields };
+    });
+    setTimeout(() => {
+      setSelectedFieldId(newField.id);
+    }, 0);
   };
 
   const updateField = (fieldId, updates) => {
     setConfig(prev => ({
       ...prev,
-      fields: prev.fields.map(field => 
+      fields: prev.fields.map(field =>
         field.id === fieldId ? { ...field, ...updates } : field
       )
     }));
@@ -114,7 +115,7 @@ const FormBuilder = ({ eventId, onSave }) => {
       ...prev,
       fields: prev.fields.filter(field => field.id !== fieldId)
     }));
-    setSelectedField(null);
+    setSelectedFieldId(null);
   };
 
   const updateSettings = (settings) => {
@@ -336,8 +337,8 @@ const FormBuilder = ({ eventId, onSave }) => {
                           <FormField
                             key={field.id}
                             field={field}
-                            isSelected={selectedField?.id === field.id}
-                            onSelect={() => setSelectedField(field)}
+                            isSelected={selectedFieldId === field.id}
+                            onSelect={() => setSelectedFieldId(field.id)}
                             onUpdate={(updates) => updateField(field.id, updates)}
                             onRemove={() => removeField(field.id)}
                           />
@@ -357,53 +358,57 @@ const FormBuilder = ({ eventId, onSave }) => {
                 <h3 className="text-lg font-medium text-gray-900">Propriedades</h3>
               </div>
               <div className="card-body">
-                {selectedField ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="form-label">Rótulo</label>
-                      <input
-                        type="text"
-                        value={selectedField.label}
-                        onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
-                        className="input"
-                      />
+                {(() => {
+                  const selectedField = config.fields.find(f => f.id === selectedFieldId);
+                  if (selectedField) {
+                    return (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="form-label">Rótulo</label>
+                          <input
+                            type="text"
+                            value={selectedField.label}
+                            onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
+                            className="input"
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label">Placeholder</label>
+                          <input
+                            type="text"
+                            value={selectedField.placeholder}
+                            onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
+                            className="input"
+                          />
+                        </div>
+                        <div>
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedField.required}
+                              onChange={(e) => updateField(selectedField.id, { required: e.target.checked })}
+                              className="mr-2"
+                            />
+                            Campo obrigatório
+                          </label>
+                        </div>
+                        <button
+                          onClick={() => removeField(selectedField.id)}
+                          className="btn-danger w-full"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remover Campo
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-center py-8">
+                      <Type className="mx-auto h-8 w-8 text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-500">Selecione um campo para editar suas propriedades</p>
                     </div>
-                    <div>
-                      <label className="form-label">Placeholder</label>
-                      <input
-                        type="text"
-                        value={selectedField.placeholder}
-                        onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedField.required}
-                          onChange={(e) => updateField(selectedField.id, { required: e.target.checked })}
-                          className="mr-2"
-                        />
-                        Campo obrigatório
-                      </label>
-                    </div>
-                    <button
-                      onClick={() => removeField(selectedField.id)}
-                      className="btn-danger w-full"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remover Campo
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Settings className="mx-auto h-8 w-8 text-gray-400" />
-                    <p className="mt-2 text-sm text-gray-500">
-                      Selecione um campo para editar suas propriedades
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           </div>
