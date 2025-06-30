@@ -70,6 +70,9 @@ router.post('/:eventId/guests/import', isEventEditor, csvUpload.single('file'), 
 router.get('/:eventId/guests/export', GuestController.exportGuests);
 router.get('/:eventId/guests/:guestId', GuestController.getGuestById);
 
+// Rota de check-in específica para evento
+router.post('/:eventId/checkin', canCheckIn, EventController.performEventCheckIn);
+
 // Rotas apenas para admin
 router.get('/', requireAdmin, EventController.getAllEvents);
 

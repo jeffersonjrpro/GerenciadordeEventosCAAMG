@@ -231,7 +231,7 @@ const PublicEvent = () => {
 
   const downloadQRCode = () => {
     const link = document.createElement('a');
-    link.href = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/qr-code/${guest.qrCode}`;
+    link.href = guest.qrCodeImage;
     link.download = `qrcode-${guest.name}.png`;
     document.body.appendChild(link);
     link.click();
@@ -357,9 +357,13 @@ const PublicEvent = () => {
               </h3>
               <div className="bg-white border-4 border-gray-200 rounded-2xl p-6 inline-block mb-6">
                 <img
-                  src={`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/qr-code/${guest.qrCode}`}
+                  src={guest.qrCodeImage}
                   alt="QR Code"
                   className="w-48 h-48"
+                  onError={(e) => {
+                    console.error('❌ Erro ao carregar QR Code:', e.target.src);
+                    e.target.style.display = 'none';
+                  }}
                 />
               </div>
               <p className="text-sm text-gray-600 mb-2">

@@ -1,6 +1,7 @@
 const { body, validationResult } = require('express-validator');
 const EventService = require('../services/eventService');
 const OrganizerService = require('../services/organizerService');
+const prisma = require('../config/database');
 
 class EventController {
   // Validações para criação de evento (campos obrigatórios)
@@ -858,6 +859,118 @@ class EventController {
       res.status(500).json({
         error: 'Erro interno do servidor',
         message: error.message
+      });
+    }
+  }
+
+  // Realizar check-in em evento específico
+  static async performEventCheckIn(req, res) {
+    try {
+      const { eventId } = req.params;
+      const { guestId } = req.body; // Pode ser ID ou código QR
+      
+      // Se guestId é um código (contém letras), buscar por qrCode
+      // Se é um ID (só números), buscar por ID
+      const isQRCode = /[A-Za-z]/.test(guestId);
+      
+      let guest;
+      if (isQRCode) {
+        guest = await prisma.guest.findFirst({
+          where: {
+            qrCode: guestId,
+            eventId: eventId
+          },
+          include: {
+            event: true,
+            checkIns: true
+          }
+        });
+      } else {
+        guest = await prisma.guest.findFirst({
+          where: {
+            id: guestId,
+            eventId: eventId
+          },
+          include: {
+            event: true,
+            checkIns: true
+          }
+        });
+      }
+
+      if (!guest) {
+        return res.status(400).json({
+          message: 'Convidado não encontrado para este evento'
+        });
+      }
+
+      // Verificar se o evento pertence ao usuário
+      if (guest.event.userId !== req.user.id) {
+        return res.status(403).json({
+          message: 'Você não tem permissão para fazer check-in neste evento'
+        });
+      }
+
+      // Verificar se o evento está ativo
+      if (!guest.event.isActive) {
+        return res.status(400).json({
+          message: 'Evento não está ativo'
+        });
+      }
+
+      // Verificar se já foi feito check-in
+      if (guest.checkIns.length > 0) {
+        return res.status(400).json({
+          message: 'Check-in já foi realizado para este convidado'
+        });
+      }
+
+      // Verificar se o convidado confirmou presença
+      if (!guest.confirmed) {
+        return res.status(400).json({
+          message: 'Convidado não confirmou presença'
+        });
+      }
+
+      // Realizar check-in
+      const checkIn = await prisma.checkIn.create({
+        data: {
+          eventId: guest.event.id,
+          guestId: guest.id
+        },
+        include: {
+          guest: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              qrCode: true
+            }
+          },
+          event: {
+            select: {
+              id: true,
+              name: true,
+              date: true,
+              location: true
+            }
+          }
+        }
+      });
+
+      res.status(201).json({
+        message: 'Check-in realizado com sucesso',
+        data: {
+          ...checkIn,
+          checkedInAt: checkIn.checkedInAt
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao realizar check-in:', error);
+      
+      res.status(500).json({
+        message: 'Erro interno do servidor'
       });
     }
   }

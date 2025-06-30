@@ -1090,7 +1090,9 @@ class GuestController {
   static async addPublicGuest(req, res) {
     try {
       const { eventId } = req.params;
-      const { name, email, phone, confirmed } = req.body;
+      const { name, email, phone, confirmed, ...otherFields } = req.body;
+
+      console.log('📝 Dados recebidos na inscrição pública:', req.body);
 
       // Verificar se o evento existe e é público
       const event = await prisma.event.findFirst({
@@ -1130,6 +1132,17 @@ class GuestController {
         });
       }
 
+      // Processar campos personalizados
+      const customFields = {};
+      Object.keys(otherFields).forEach(key => {
+        // Ignorar campos padrão do sistema
+        if (!['name', 'email', 'phone', 'confirmed'].includes(key)) {
+          customFields[key] = otherFields[key];
+        }
+      });
+
+      console.log('🔧 Campos personalizados processados:', customFields);
+
       // Gerar QR Code único
       const qrCode = await generateSimpleCode(eventId);
 
@@ -1138,9 +1151,10 @@ class GuestController {
         data: {
           name,
           email,
-          phone,
+          phone: phone || null,
           qrCode,
           eventId,
+          customFields: Object.keys(customFields).length > 0 ? customFields : null,
           confirmed: confirmed === 'true' || confirmed === true,
           confirmedAt: (confirmed === 'true' || confirmed === true) ? new Date() : null
         },
@@ -1149,9 +1163,23 @@ class GuestController {
         }
       });
 
+      // Gerar QR Code como data URL para exibição
+      const qrCodeDataURL = await QRCode.toDataURL(guest.qrCode, {
+        width: 300,
+        margin: 2
+      });
+
+      console.log('✅ Convidado criado com campos personalizados:', guest);
+
+      // Adicionar qrCodeImage aos dados de resposta
+      const guestWithQRCode = {
+        ...guest,
+        qrCodeImage: qrCodeDataURL
+      };
+
       res.status(201).json({
         success: true,
-        data: guest,
+        data: guestWithQRCode,
         message: 'Inscrição realizada com sucesso!'
       });
     } catch (error) {

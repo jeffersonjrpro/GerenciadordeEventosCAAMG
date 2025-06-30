@@ -62,8 +62,8 @@ const Layout = () => {
   const logoSrc = darkMode ? logo : logoPreta;
   const btnCollapseBg = darkMode ? 'bg-white' : 'bg-black';
   const btnCollapseIcon = darkMode ? 'text-[#2C3A4B]' : 'text-white';
-  const menuItemHover = darkMode ? 'hover:bg-[#3A4A5E]' : 'hover:bg-gray-100';
-  const menuItemActive = darkMode ? 'bg-white text-[#6C63FF] font-bold shadow' : 'bg-[#F3F4F6] text-[#6C63FF] font-bold shadow';
+  const menuItemHover = darkMode ? 'hover:bg-[#3A4A5E] hover:shadow-md' : 'hover:bg-gray-100 hover:shadow-sm';
+  const menuItemActive = darkMode ? 'bg-[#4B5A6A] text-[#6C63FF] font-bold shadow-lg border-l-4 border-[#6C63FF]' : 'bg-[#F3F4F6] text-[#6C63FF] font-bold shadow border-l-4 border-[#6C63FF]';
 
   // Buscar eventos abertos quando abrir modal
   useEffect(() => {
@@ -100,7 +100,7 @@ const Layout = () => {
               return (
                 <button
                   key={item.name}
-                  className={`w-full text-left flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  className={`w-full text-left flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition-all duration-200 ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
                   onClick={() => { setShowCheckinModal(true); setModalTipo('checkin'); }}
                   type="button"
                 >
@@ -113,7 +113,7 @@ const Layout = () => {
               return (
                 <button
                   key={item.name}
-                  className={`w-full text-left flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  className={`w-full text-left flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition-all duration-200 ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
                   onClick={() => { setShowConvidadosModal(true); setModalTipo('convidados'); }}
                   type="button"
                 >
@@ -126,7 +126,7 @@ const Layout = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                className={`flex items-center gap-4 px-4 py-3 my-2 rounded-r-2xl transition-all duration-200 ${isActive(item.href) ? menuItemActive : textMenu + ' ' + menuItemHover} text-base ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
               >
                 <span className="text-2xl" style={{ color: item.color }}>{item.icon}</span>
                 {!sidebarCollapsed && <span>{item.name}</span>}
