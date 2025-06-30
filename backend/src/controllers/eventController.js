@@ -255,15 +255,15 @@ class EventController {
         status: req.query.status
       };
 
-      const result = await EventService.getAllEvents(filters);
+      // Buscar apenas eventos do usuário logado (criador ou organizador)
+      const result = await EventService.getUserEvents(req.user.id, filters);
 
       res.json({
         data: result.events,
         pagination: result.pagination
       });
     } catch (error) {
-      console.error('Erro ao listar todos os eventos:', error);
-      
+      console.error('Erro ao listar eventos do usuário:', error);
       res.status(500).json({
         error: 'Erro interno do servidor'
       });

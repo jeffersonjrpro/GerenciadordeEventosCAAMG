@@ -1,4 +1,4 @@
-const { prisma } = require('./src/config/database');
+const prisma = require('./src/config/database');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 

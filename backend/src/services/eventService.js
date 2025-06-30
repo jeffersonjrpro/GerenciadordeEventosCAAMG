@@ -1,4 +1,4 @@
-const { prisma } = require('../config/database');
+const prisma = require('../config/database');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const OrganizerService = require('./organizerService');
@@ -7,6 +7,9 @@ class EventService {
   // Criar novo evento
   static async createEvent(userId, eventData) {
     const { name, description, date, location, maxGuests, customFields, companyId } = eventData;
+
+    // Buscar o usuário para pegar o empresaId
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     const event = await prisma.event.create({
       data: {
@@ -18,7 +21,8 @@ class EventService {
         customFields: customFields || {},
         isPublic: true,
         userId,
-        companyId
+        companyId,
+        empresaId: user.empresaId // Vincula o evento à empresa do usuário
       },
       include: {
         user: {
@@ -60,15 +64,25 @@ class EventService {
     
     // Se userId fornecido, verificar se o usuário tem acesso ao evento
     if (userId) {
-      // Verificar se é o criador ou organizador do evento
-      const isCreator = await prisma.event.findFirst({
-        where: { id: eventId, userId }
-      });
-      
-      const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
-      
-      if (!isCreator && !isOrganizer) {
-        throw new Error('Sem permissão para acessar este evento');
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user.role === 'ORGANIZER') {
+        if (user.trabalharTodosEventos) {
+          // Permite se o evento for da mesma empresa
+          const event = await prisma.event.findFirst({ where: { id: eventId, empresaId: user.empresaId } });
+          if (!event) throw new Error('Sem permissão para acessar este evento');
+        } else if (user.eventosIds && user.eventosIds.includes(eventId)) {
+          // Permite se o evento está na lista de eventosIds
+          // ok
+        } else {
+          throw new Error('Sem permissão para acessar este evento');
+        }
+      } else {
+        // Checagem padrão: criador ou organizador relacional
+        const isCreator = await prisma.event.findFirst({ where: { id: eventId, userId } });
+        const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
+        if (!isCreator && !isOrganizer) {
+          throw new Error('Sem permissão para acessar este evento');
+        }
       }
     }
 
@@ -136,21 +150,43 @@ class EventService {
     const { page = 1, limit = 10, search = '', status = 'all' } = filters;
     const skip = (page - 1) * limit;
 
-    const where = {
-      OR: [
-        { userId }, // Eventos criados pelo usuário
-        { organizers: { some: { userId } } } // Eventos onde é organizador
-      ],
-      ...(search && {
+    // Buscar usuário para saber permissões
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    let where = {};
+
+    if (user.role === 'ORGANIZER') {
+      if (user.trabalharTodosEventos) {
+        // ORGANIZER pode ver todos os eventos da empresa
+        where.empresaId = user.empresaId;
+      } else if (user.eventosIds && user.eventosIds.length > 0) {
+        where.id = { in: user.eventosIds };
+      } else {
+        // Não retorna nenhum evento
+        where.id = -1;
+      }
+    } else {
+      // Admin ou criador: eventos criados ou onde é organizador
+      where = {
+        OR: [
+          { userId }, // Eventos criados pelo usuário
+          { organizers: { some: { userId } } } // Eventos onde é organizador
+        ]
+      };
+    }
+
+    // Filtros adicionais
+    if (search) {
+      where = {
+        ...where,
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
           { location: { contains: search, mode: 'insensitive' } }
         ]
-      }),
-      ...(status === 'active' && { isActive: true }),
-      ...(status === 'inactive' && { isActive: false })
-    };
+      };
+    }
+    if (status === 'active') where.isActive = true;
+    if (status === 'inactive') where.isActive = false;
 
     const [events, total] = await Promise.all([
       prisma.event.findMany({

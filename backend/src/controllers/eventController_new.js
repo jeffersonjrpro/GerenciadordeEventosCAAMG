@@ -471,6 +471,7 @@ class EventController {
         error: 'Erro interno do servidor'
       });
     }
+  }
 
   // Verificar status das inscrições
   static async getRegistrationStatus(req, res) {

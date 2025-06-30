@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 const Login = () => {
   const { login } = useAuth();
@@ -29,22 +30,10 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        <div className="flex flex-col items-center mb-6">
+          <img src={logo} alt="Logo do App" className="h-16 w-auto" />
+        </div>
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-100">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Entre na sua conta
           </h2>

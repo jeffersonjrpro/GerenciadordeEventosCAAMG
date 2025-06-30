@@ -10,6 +10,112 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===== SISTEMA SAAS - NOVAS TABELAS =====
+
+model Empresa {
+  id            String        @id @default(cuid())
+  nome          String
+  emailContato  String
+  telefone      String?
+  endereco      String?
+  cidade        String?
+  estado        String?
+  cep           String?
+  status        EmpresaStatus @default(ATIVA)
+  planoId       String?
+  plano         Plano?        @relation(fields: [planoId], references: [id])
+  usuarios      User[]        @relation("UsuariosEmpresa")
+  eventos       Event[]
+  faturas       Fatura[]
+  setores       Setor[]
+  criadoEm      DateTime      @default(now())
+  atualizadoEm  DateTime      @updatedAt
+  createdById   String?
+  createdBy     User?         @relation("CriadorEmpresa", fields: [createdById], references: [id])
+
+  @@map("empresas")
+}
+
+model Plano {
+  id                String    @id @default(cuid())
+  nome              String
+  preco             Float
+  descricao         String?
+  limiteEventos     Int
+  limiteConvidados  Int
+  limiteEmpresas    Int?      // Para planos white-label
+  faturas           Fatura[]
+  empresas          Empresa[]
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
+
+  @@map("planos")
+}
+
+model Fatura {
+  id          String        @id @default(cuid())
+  empresaId   String
+  empresa     Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  planoId     String?
+  plano       Plano?        @relation(fields: [planoId], references: [id])
+  valor       Float
+  status      FaturaStatus  @default(PENDENTE)
+  vencimento  DateTime
+  pagamentoEm DateTime?
+  criadoEm    DateTime      @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  @@map("faturas")
+}
+
+model AdminMaster {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  nome      String
+  senha     String
+  nivel     AdminNivel    @default(SUPORTE)
+  ativo     Boolean       @default(true)
+  criadoEm  DateTime      @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  // Logs de ações
+  logs      AdminLog[]
+
+  @@map("admin_masters")
+}
+
+model AdminLog {
+  id          String    @id @default(cuid())
+  adminId     String
+  admin       AdminMaster @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  acao        String    // "BLOQUEAR_EMPRESA", "CRIAR_PLANO", etc.
+  detalhes    Json?     // Dados adicionais da ação
+  criadoEm    DateTime  @default(now())
+
+  @@map("admin_logs")
+}
+
+// ===== ENUMS DO SISTEMA SAAS =====
+
+enum EmpresaStatus {
+  ATIVA
+  BLOQUEADA
+}
+
+enum FaturaStatus {
+  PAGO
+  PENDENTE
+  VENCIDA
+}
+
+enum AdminNivel {
+  MASTER      // Acesso total
+  SUPORTE     // Acesso limitado
+  LEITURA     // Apenas visualização
+}
+
+// ===== MODELOS EXISTENTES (ATUALIZADOS) =====
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -28,23 +134,39 @@ model User {
   email     String   @unique
   name      String
   password  String
+  telefone  String?
+  nomeEmpresa String?
   role      UserRole @default(ORGANIZER)
+  nivel     UserNivel @default(CHECKIN)
+  ativo     Boolean  @default(true)
+  eventosIds Json?
+  trabalharTodosEventos Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relacionamentos
+  lastLoginAt DateTime?
+  fotoPerfil String?
+  endereco String?
+  cpf String?
+  dataNascimento DateTime?
+  pix String?
+  trabalhou Boolean?
+  diasTrabalhados Json?
+  eventosTrabalhados Json?
+  pagamentos Json?
+  foiPago Boolean?
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  
-  // Eventos criados pelo usuário (mantém compatibilidade)
+  empresaId String?
+  empresa   Empresa? @relation("UsuariosEmpresa", fields: [empresaId], references: [id], onDelete: SetNull)
+  empresasCriadas Empresa[]   @relation("CriadorEmpresa")
   events Event[]
-  
-  // Organizadores de eventos
   eventOrganizers EventOrganizer[]
-  
-  // Convites enviados
   sentInvites TeamInvite[]
-
+  podeGerenciarDemandas Boolean @default(false)
+  demandasDemanda  Demanda[] @relation("UsuariosResponsaveisDemanda")
+  demandasCriadas  Demanda[] @relation("UserCriadorDemanda")
+  agendamentosCriados Agendamento[] @relation("UserAgendamentosCriados")
+  notifications Notification[]
   @@map("users")
 }
 
@@ -69,6 +191,10 @@ model Event {
   // Relacionamentos
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  
+  // Relacionamento com Empresa (SaaS)
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
   
   // Criador do evento (mantém compatibilidade)
   userId    String
@@ -190,9 +316,18 @@ model Consumo {
   @@map("consumos")
 }
 
+// ===== ENUMS EXISTENTES =====
+
 enum UserRole {
   ADMIN
   ORGANIZER
+}
+
+enum UserNivel {
+  CHECKIN   // Apenas check-in
+  EDITOR    // Editor de página + check-in
+  ADMIN     // Administrador da empresa
+  PROPRIETARIO // Proprietário da empresa
 }
 
 enum OrganizerRole {
@@ -206,4 +341,91 @@ enum InviteStatus {
   ACCEPTED
   DECLINED
   EXPIRED
+}
+
+model Setor {
+  id        String    @id @default(uuid())
+  nome      String
+  empresaId String
+  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  demandas  Demanda[]
+  @@map("setores")
+}
+
+model Demanda {
+  id             String      @id @default(uuid())
+  solicitacao    String      @unique
+  numeroFluig    String?
+  nomeProjeto    String
+  descricao      String?     // Descrição/detalhes da demanda
+  solicitante    String
+  prioridade     String      // ALTA, MEDIA, BAIXA
+  status         String      // ABERTO, EM_ANDAMENTO, CONCLUIDO, PAUSADO
+  dataAbertura   DateTime
+  dataEntrega    DateTime
+  dataTermino    DateTime?
+  linkPastaProjeto String?
+  linkSite         String?
+  setorId        String
+  setor          Setor       @relation(fields: [setorId], references: [id])
+  responsaveis   User[]   @relation("UsuariosResponsaveisDemanda")
+  observacoes    Observacao[]
+  criadoPorId    String
+  criadoPor      User        @relation("UserCriadorDemanda", fields: [criadoPorId], references: [id])
+  @@map("demandas")
+}
+
+model Observacao {
+  id         String   @id @default(uuid())
+  texto      String
+  data       DateTime @default(now())
+  autorId    String
+  autor      Usuario  @relation("ObservacoesDoAutor", fields: [autorId], references: [id])
+  demandaId  String
+  demanda    Demanda  @relation(fields: [demandaId], references: [id])
+  @@map("observacoes")
+}
+
+model Usuario {
+  id       String   @id @default(uuid())
+  nome     String
+  email    String   @unique
+  empresaId String
+  observacoesCriadas Observacao[] @relation("ObservacoesDoAutor")
+  podeGerenciarDemandas Boolean @default(false)
+  @@map("usuarios")
+}
+
+// ===== AGENDAMENTOS =====
+
+enum Visibilidade {
+  PRIVADO
+  EQUIPE
+}
+
+model Agendamento {
+  id                   String      @id @default(uuid())
+  titulo               String
+  descricao            String?
+  dataInicio           DateTime
+  dataFim              DateTime
+  categoria            String
+  lembreteMinutosAntes Int
+  criadoPorId          String
+  criadoPor            User        @relation("UserAgendamentosCriados", fields: [criadoPorId], references: [id])
+  equipeId             String
+  visibilidade         Visibilidade
+  criadoEm             DateTime    @default(now())
+  notifications        Notification[]
+}
+
+model Notification {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  agendamentoId  String
+  agendamento    Agendamento  @relation(fields: [agendamentoId], references: [id])
+  mensagem       String
+  lida           Boolean       @default(false)
+  criadaEm       DateTime      @default(now())
 } 

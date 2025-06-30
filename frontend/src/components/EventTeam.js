@@ -47,7 +47,7 @@ const EventTeam = ({ eventId }) => {
   };
 
   const handleRemoveOrganizer = async (userId) => {
-    if (!confirm('Tem certeza que deseja remover este organizador?')) return;
+    if (!window.confirm('Tem certeza que deseja remover este organizador?')) return;
 
     try {
       await api.delete(`/organizers/events/${eventId}/organizers/${userId}`);
@@ -73,7 +73,7 @@ const EventTeam = ({ eventId }) => {
   };
 
   const handleCancelInvite = async (inviteId) => {
-    if (!confirm('Tem certeza que deseja cancelar este convite?')) return;
+    if (!window.confirm('Tem certeza que deseja cancelar este convite?')) return;
 
     try {
       await api.delete(`/organizers/invites/${inviteId}`);

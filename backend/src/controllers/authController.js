@@ -6,8 +6,8 @@ class AuthController {
   static registerValidation = [
     body('name')
       .trim()
-      .isLength({ min: 2, max: 100 })
-      .withMessage('Nome deve ter entre 2 e 100 caracteres'),
+      .isLength({ min: 2 })
+      .withMessage('Nome deve ter pelo menos 2 caracteres'),
     body('email')
       .isEmail()
       .normalizeEmail()
@@ -16,7 +16,17 @@ class AuthController {
       .isLength({ min: 6 })
       .withMessage('Senha deve ter pelo menos 6 caracteres')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número')
+      .withMessage('Senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número'),
+    body('telefone')
+      .optional()
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('Telefone deve ter pelo menos 10 dígitos'),
+    body('nomeEmpresa')
+      .optional()
+      .trim()
+      .isLength({ min: 2 })
+      .withMessage('Nome da empresa deve ter pelo menos 2 caracteres')
   ];
 
   // Validações para login
@@ -35,19 +45,30 @@ class AuthController {
     body('name')
       .optional()
       .trim()
-      .isLength({ min: 2, max: 100 })
-      .withMessage('Nome deve ter entre 2 e 100 caracteres'),
+      .isLength({ min: 1 })
+      .withMessage('Nome deve ter pelo menos 1 caractere'),
     body('email')
       .optional()
       .isEmail()
       .normalizeEmail()
       .withMessage('Email inválido'),
-    body('currentPassword')
+    body('telefone')
       .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage('Telefone deve ter pelo menos 1 dígito'),
+    body('nomeEmpresa')
+      .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage('Nome da empresa deve ter pelo menos 1 caractere')
+  ];
+
+  static updatePasswordValidation = [
+    body('currentPassword')
       .notEmpty()
       .withMessage('Senha atual é obrigatória para alterar senha'),
     body('newPassword')
-      .optional()
       .isLength({ min: 6 })
       .withMessage('Nova senha deve ter pelo menos 6 caracteres')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
@@ -66,12 +87,14 @@ class AuthController {
         });
       }
 
-      const { name, email, password } = req.body;
+      const { name, email, password, telefone, nomeEmpresa } = req.body;
 
       const result = await AuthService.register({
         name,
         email,
-        password
+        password,
+        telefone,
+        nomeEmpresa
       });
 
       res.status(201).json({
@@ -151,6 +174,48 @@ class AuthController {
   // Atualizar perfil do usuário
   static async updateProfile(req, res) {
     try {
+      console.log('=== DEBUG UPDATE PROFILE ===');
+      console.log('User ID:', req.user.id);
+      console.log('Request body:', req.body);
+      
+      // Verificar erros de validação
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        console.log('Validation errors:', errors.array());
+        return res.status(400).json({
+          error: 'Dados inválidos',
+          details: errors.array()
+        });
+      }
+
+      const updateData = req.body;
+      console.log('Update data:', updateData);
+      
+      const updatedUser = await AuthService.updateProfile(req.user.id, updateData);
+      console.log('Updated user:', updatedUser);
+
+      res.json({
+        message: 'Perfil atualizado com sucesso',
+        data: updatedUser
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
+      
+      if (error.message.includes('Email já está em uso')) {
+        return res.status(400).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Alterar senha do usuário
+  static async updatePassword(req, res) {
+    try {
       // Verificar erros de validação
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -160,18 +225,16 @@ class AuthController {
         });
       }
 
-      const updateData = req.body;
-      const updatedUser = await AuthService.updateProfile(req.user.id, updateData);
+      const { currentPassword, newPassword } = req.body;
+      await AuthService.updatePassword(req.user.id, { currentPassword, newPassword });
 
       res.json({
-        message: 'Perfil atualizado com sucesso',
-        data: updatedUser
+        message: 'Senha alterada com sucesso'
       });
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      console.error('Erro ao alterar senha:', error);
       
-      if (error.message.includes('Email já está em uso') || 
-          error.message.includes('Senha atual incorreta') ||
+      if (error.message.includes('Senha atual incorreta') ||
           error.message.includes('Senha atual é necessária')) {
         return res.status(400).json({
           error: error.message

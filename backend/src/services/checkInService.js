@@ -1,4 +1,4 @@
-const { prisma } = require('../config/database');
+const prisma = require('../config/database');
 
 class CheckInService {
   // Realizar check-in

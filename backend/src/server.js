@@ -5,6 +5,9 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+// Importar inicialização do banco
+const { initializeDatabase } = require('./config/init');
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const eventRoutes = require('./routes/events');
@@ -13,6 +16,12 @@ const publicRoutes = require('./routes/public');
 const guestRoutes = require('./routes/guests');
 const organizerRoutes = require('./routes/organizers');
 const subEventoRoutes = require('./routes/subeventos');
+const adminRoutes = require('./routes/admin');
+const faturaRoutes = require('./routes/faturas');
+const demandasRoutes = require('./routes/demandas');
+const empresasRoutes = require('./routes/empresas');
+const notificationRoutes = require('./routes/notifications');
+const agendamentoRoutes = require('./routes/agendamentos');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -67,6 +76,7 @@ app.use('/api/checkin', checkInRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/guests', guestRoutes);
 app.use('/api/organizers', organizerRoutes);
+app.use('/api/faturas', faturaRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
@@ -78,6 +88,11 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api', subEventoRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api', demandasRoutes);
+app.use('/api', empresasRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/agendamentos', agendamentoRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {
@@ -111,10 +126,25 @@ app.use('*', (req, res) => {
 });
 
 // Inicialização do servidor
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API disponível em: http://localhost:${PORT}/api`);
+  
+  // Verificar conexão com banco e inicializar estruturas
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    await prisma.$connect();
+    console.log('✅ Conectado ao banco de dados');
+    
+    // Inicializar estruturas necessárias
+    await initializeDatabase();
+    
+    await prisma.$disconnect();
+  } catch (error) {
+    console.error('❌ Erro ao conectar com o banco:', error);
+  }
 });
 
 module.exports = app; 

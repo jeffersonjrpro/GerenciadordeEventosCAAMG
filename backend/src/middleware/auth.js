@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { prisma } = require('../config/database');
+const prisma = require('../config/database');
 
 // Middleware para verificar token JWT
 const authenticateToken = async (req, res, next) => {
@@ -22,7 +22,15 @@ const authenticateToken = async (req, res, next) => {
         id: true,
         email: true,
         name: true,
-        role: true
+        role: true,
+        telefone: true,
+        nomeEmpresa: true,
+        nivel: true,
+        ativo: true,
+        empresaId: true,
+        eventosIds: true,
+        trabalharTodosEventos: true,
+        podeGerenciarDemandas: true
       }
     });
 
@@ -88,7 +96,15 @@ const optionalAuth = async (req, res, next) => {
           id: true,
           email: true,
           name: true,
-          role: true
+          role: true,
+          telefone: true,
+          nomeEmpresa: true,
+          nivel: true,
+          ativo: true,
+          empresaId: true,
+          eventosIds: true,
+          trabalharTodosEventos: true,
+          podeGerenciarDemandas: true
         }
       });
       

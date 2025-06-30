@@ -1,53 +1,96 @@
 import React from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirmar', cancelText = 'Cancelar' }) => {
+export default function ConfirmationModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title = 'Confirmar ação', 
+  message = 'Tem certeza que deseja realizar esta ação?',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  type = 'danger' // 'danger', 'warning', 'info'
+}) {
   if (!isOpen) return null;
 
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'danger':
+        return {
+          icon: 'text-red-600',
+          bg: 'bg-red-50',
+          button: 'bg-red-600 hover:bg-red-700 text-white',
+          border: 'border-red-200'
+        };
+      case 'warning':
+        return {
+          icon: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+          button: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+          border: 'border-yellow-200'
+        };
+      case 'info':
+        return {
+          icon: 'text-blue-600',
+          bg: 'bg-blue-50',
+          button: 'bg-blue-600 hover:bg-blue-700 text-white',
+          border: 'border-blue-200'
+        };
+      default:
+        return {
+          icon: 'text-gray-600',
+          bg: 'bg-gray-50',
+          button: 'bg-gray-600 hover:bg-gray-700 text-white',
+          border: 'border-gray-200'
+        };
+    }
+  };
+
+  const styles = getTypeStyles();
+
+  const handleConfirm = () => {
+    onConfirm();
+    onClose();
+  };
+
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4"
-      aria-labelledby="modal-title"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md animate-fade-in">
-        <div className="p-6">
-          <div className="flex items-start">
-            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-              <AlertTriangle className="h-6 w-6 text-red-600" aria-hidden="true" />
-            </div>
-            <div className="mt-0 ml-4 text-left">
-              <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
-                {title}
-              </h3>
-              <div className="mt-2">
-                <p className="text-sm text-gray-600">
-                  {message}
-                </p>
-              </div>
-            </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className={`bg-white rounded-lg shadow-xl max-w-md w-full ${styles.border} border-2`}>
+        {/* Header */}
+        <div className={`${styles.bg} px-6 py-4 rounded-t-lg flex items-center justify-between`}>
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className={`h-6 w-6 ${styles.icon} mr-3`} />
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           </div>
-        </div>
-        <div className="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse rounded-b-lg">
           <button
-            type="button"
-            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-            onClick={onConfirm}
-          >
-            {confirmText}
-          </button>
-          <button
-            type="button"
-            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
             onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-4">
+          <p className="text-gray-700 leading-relaxed">{message}</p>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
           >
             {cancelText}
+          </button>
+          <button
+            onClick={handleConfirm}
+            className={`px-4 py-2 rounded-md transition-colors ${styles.button}`}
+          >
+            {confirmText}
           </button>
         </div>
       </div>
     </div>
   );
-};
-
-export default ConfirmationModal; 
+} 

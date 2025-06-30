@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Building } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 const Register = () => {
   const { register: registerUser } = useAuth();
@@ -22,7 +23,7 @@ const Register = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await registerUser(data);
+      await registerUser({ ...data, nivel: 'ADMIN' });
     } catch (error) {
       console.error('Erro no registro:', error);
     } finally {
@@ -33,22 +34,10 @@ const Register = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        <div className="flex flex-col items-center mb-6">
+          <img src={logo} alt="Logo do App" className="h-16 w-auto" />
+        </div>
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-100">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
-          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Crie sua conta
           </h2>
@@ -117,6 +106,60 @@ const Register = () => {
               </div>
               {errors.email && (
                 <p className="form-error">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="telefone" className="form-label">
+                Telefone
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="telefone"
+                  type="tel"
+                  autoComplete="tel"
+                  className="input pl-10"
+                  placeholder="(11) 99999-9999"
+                  {...register('telefone', {
+                    minLength: {
+                      value: 10,
+                      message: 'Telefone deve ter pelo menos 10 dígitos',
+                    },
+                  })}
+                />
+              </div>
+              {errors.telefone && (
+                <p className="form-error">{errors.telefone.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="nomeEmpresa" className="form-label">
+                Nome da Empresa
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Building className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="nomeEmpresa"
+                  type="text"
+                  autoComplete="organization"
+                  className="input pl-10"
+                  placeholder="Nome da sua empresa"
+                  {...register('nomeEmpresa', {
+                    minLength: {
+                      value: 2,
+                      message: 'Nome da empresa deve ter pelo menos 2 caracteres',
+                    },
+                  })}
+                />
+              </div>
+              {errors.nomeEmpresa && (
+                <p className="form-error">{errors.nomeEmpresa.message}</p>
               )}
             </div>
 

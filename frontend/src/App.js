@@ -35,6 +35,7 @@ import AdminLogin from './pages/admin/Login';
 import AdminRoute from './components/admin/AdminRoute';
 import Demandas from './pages/Demandas';
 import AddGuest from './pages/AddGuest';
+import Agendamentos from './pages/Agendamentos';
 
 function App() {
   return (
@@ -99,6 +100,7 @@ function App() {
                 <Route path="plano-faturas" element={<PlanoFaturas />} />
                 <Route path="gerenciar-equipe" element={<GerenciarEquipe />} />
                 <Route path="demandas" element={<Demandas />} />
+                <Route path="agendamentos" element={<Agendamentos />} />
               </Route>
               
               {/* Rota de login do painel master admin */}

@@ -81,6 +81,10 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - ✅ **🎫 Controle de Limite por Convidado**
 - ✅ **🔍 Validação de Acesso com Feedback Visual**
 - ✅ **📱 Interface Moderna para Gerenciamento**
+- ✅ **📅 Sistema de Agendamentos com FullCalendar**
+- ✅ **🔔 Lembretes e Notificações In-App**
+- ✅ **👥 Controle de Visibilidade (Privado/Equipe)**
+- ✅ **📊 Categorização e Filtros Avançados**
 
 ## 🏢 Sistema SaaS - Estrutura Multi-Empresa
 
@@ -193,6 +197,54 @@ O sistema agora inclui um painel administrativo completo para gestão de múltip
 3. **Geração de Senha**: Sistema gera senha temporária
 4. **Notificação**: Usuário recebe email com credenciais
 5. **Gestão**: Editar, remover ou visualizar usuários
+
+## 📅 Sistema de Agendamentos
+
+### **Funcionalidades Principais:**
+- **Calendário Completo:**
+  - Interface FullCalendar moderna e responsiva
+  - Visualizações: mês, semana, dia
+  - Navegação intuitiva com português brasileiro
+  - Cores diferenciadas por categoria
+- **Criar Agendamentos:**
+  - Título, descrição detalhada
+  - Data e hora de início/fim
+  - Categorias: Reunião, Tarefa, Visita, Outro
+  - Repetição de eventos (futura implementação)
+  - Lembretes configuráveis
+  - Controle de visibilidade (Privado/Equipe)
+- **Sistema de Lembretes:**
+  - Notificações in-app em tempo real
+  - Configuração de minutos antes do evento
+  - Sistema de notificações não lidas
+  - Marcar como lida
+  - Email (em desenvolvimento)
+- **Controle de Permissões:**
+  - Visibilidade privada (apenas criador)
+  - Visibilidade de equipe (todos da empresa)
+  - Apenas criador ou admin pode editar/excluir
+  - Filtros automáticos por permissão
+- **Interface Moderna:**
+  - Design responsivo com TailwindCSS
+  - Modal interativo para criação/edição
+  - Validações em tempo real
+  - Estados de loading e feedback visual
+  - Suporte a modo escuro
+  - Ícones informativos por categoria
+
+### **Como Funciona:**
+1. **Criar Agendamento**: Modal com todos os campos necessários
+2. **Visualizar**: Calendário FullCalendar com eventos coloridos
+3. **Editar/Excluir**: Apenas criador ou admin
+4. **Lembretes**: Notificações automáticas antes do evento
+5. **Visibilidade**: Controle entre privado e equipe
+6. **Categorização**: Cores e ícones por tipo de evento
+
+### **Tecnologias Utilizadas:**
+- **Frontend**: FullCalendar, Day.js, React, TailwindCSS
+- **Backend**: Node.js, Express, Prisma ORM
+- **Banco**: PostgreSQL com models dedicados
+- **Notificações**: Sistema in-app + email (futuro)
 
 ## 👥 Sistema de Organizadores Multiplos
 

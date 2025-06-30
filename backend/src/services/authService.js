@@ -1,38 +1,56 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { prisma } = require('../config/database');
+const prisma = require('../config/database');
 
 class AuthService {
   // Registrar novo usuário
   static async register(userData) {
-    const { email, name, password } = userData;
+    const { email, name, password, telefone, nomeEmpresa } = userData;
 
     // Verificar se email já existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (existingUser) {
-      throw new Error('Email já cadastrado');
-    }
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) throw new Error('Email já cadastrado');
 
     // Criptografar senha
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Criar usuário
+    // Verificar se já existe empresa com esse nome
+    let empresa = await prisma.empresa.findFirst({ where: { nome: nomeEmpresa } });
+    if (!empresa) {
+      empresa = await prisma.empresa.create({
+        data: {
+          nome: nomeEmpresa,
+          emailContato: email,
+          telefone: telefone,
+          status: 'ATIVA',
+        }
+      });
+    }
+
+    // Criar usuário vinculado à empresa
     const user = await prisma.user.create({
       data: {
         email,
         name,
         password: hashedPassword,
-        role: 'ORGANIZER' // Por padrão, novos usuários são organizadores
+        telefone,
+        nomeEmpresa,
+        role: 'ADMIN',
+        nivel: 'ADMIN',
+        empresaId: empresa.id,
+        trabalharTodosEventos: true,
       },
       select: {
         id: true,
         email: true,
         name: true,
+        telefone: true,
+        nomeEmpresa: true,
         role: true,
+        nivel: true,
+        empresaId: true,
+        trabalharTodosEventos: true,
         createdAt: true
       }
     });
@@ -66,6 +84,12 @@ class AuthService {
       throw new Error('Email ou senha inválidos');
     }
 
+    // Atualizar lastLoginAt
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
     // Gerar token JWT
     const token = this.generateToken(user.id);
 
@@ -75,7 +99,8 @@ class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      lastLoginAt: new Date()
     };
 
     return {
@@ -104,12 +129,18 @@ class AuthService {
 
   // Atualizar perfil do usuário
   static async updateProfile(userId, updateData) {
-    const { name, email, currentPassword, newPassword } = updateData;
+    console.log('=== DEBUG AUTH SERVICE UPDATE PROFILE ===');
+    console.log('User ID:', userId);
+    console.log('Update data:', updateData);
+    
+    const { name, email, telefone, nomeEmpresa } = updateData;
 
     // Buscar usuário atual
     const currentUser = await prisma.user.findUnique({
       where: { id: userId }
     });
+
+    console.log('Current user:', currentUser);
 
     if (!currentUser) {
       throw new Error('Usuário não encontrado');
@@ -119,6 +150,8 @@ class AuthService {
     const updateFields = {};
 
     if (name) updateFields.name = name;
+    if (telefone !== undefined) updateFields.telefone = telefone;
+    if (nomeEmpresa !== undefined) updateFields.nomeEmpresa = nomeEmpresa;
     
     if (email && email !== currentUser.email) {
       // Verificar se novo email já existe
@@ -132,23 +165,7 @@ class AuthService {
       updateFields.email = email;
     }
 
-    // Se quiser alterar senha
-    if (newPassword) {
-      if (!currentPassword) {
-        throw new Error('Senha atual é necessária para alterar a senha');
-      }
-
-      // Verificar senha atual
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.password);
-      
-      if (!isCurrentPasswordValid) {
-        throw new Error('Senha atual incorreta');
-      }
-
-      // Criptografar nova senha
-      const saltRounds = 12;
-      updateFields.password = await bcrypt.hash(newPassword, saltRounds);
-    }
+    console.log('Update fields:', updateFields);
 
     // Atualizar usuário
     const updatedUser = await prisma.user.update({
@@ -158,13 +175,58 @@ class AuthService {
         id: true,
         email: true,
         name: true,
+        telefone: true,
+        nomeEmpresa: true,
         role: true,
         createdAt: true,
         updatedAt: true
       }
     });
 
+    console.log('Updated user:', updatedUser);
+
+    // Atualizar nome da empresa na tabela empresas, se o usuário for admin e mudou o nome
+    if (nomeEmpresa !== undefined && currentUser.empresaId) {
+      await prisma.empresa.update({
+        where: { id: currentUser.empresaId },
+        data: { nome: nomeEmpresa }
+      });
+    }
+
     return updatedUser;
+  }
+
+  // Alterar senha do usuário
+  static async updatePassword(userId, passwordData) {
+    const { currentPassword, newPassword } = passwordData;
+
+    // Buscar usuário atual
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!currentUser) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    // Verificar senha atual
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.password);
+    
+    if (!isCurrentPasswordValid) {
+      throw new Error('Senha atual incorreta');
+    }
+
+    // Criptografar nova senha
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Atualizar senha
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword }
+    });
+
+    return true;
   }
 
   // Buscar usuário por ID
@@ -175,6 +237,8 @@ class AuthService {
         id: true,
         email: true,
         name: true,
+        telefone: true,
+        nomeEmpresa: true,
         role: true,
         createdAt: true,
         updatedAt: true

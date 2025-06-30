@@ -10,6 +10,7 @@ router.post('/login', AuthController.loginValidation, AuthController.login);
 // Rotas protegidas
 router.get('/profile', authenticateToken, AuthController.getProfile);
 router.put('/profile', authenticateToken, AuthController.updateProfileValidation, AuthController.updateProfile);
+router.put('/password', authenticateToken, AuthController.updatePasswordValidation, AuthController.updatePassword);
 router.get('/verify', authenticateToken, AuthController.verifyToken);
 
 // Rotas apenas para admin

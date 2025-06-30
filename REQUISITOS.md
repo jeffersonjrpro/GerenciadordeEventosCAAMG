@@ -198,6 +198,99 @@ Sistema completo de gerenciamento de eventos com confirmação de presença via 
 - Validação via QR Code
 - Limite por convidado
 - Feedback visual
+
+## 📅 Sistema de Agendamentos
+
+### ✅ Calendário Completo
+- **Interface FullCalendar:**
+  - Visualizações: mês, semana, dia
+  - Navegação intuitiva
+  - Português brasileiro
+  - Design responsivo
+- **Cores por Categoria:**
+  - Reunião (azul)
+  - Tarefa (verde)
+  - Visita (laranja)
+  - Outro (roxo)
+
+### ✅ Gestão de Agendamentos
+- **Criar Agendamentos:**
+  - Título e descrição
+  - Data e hora início/fim
+  - Categoria configurável
+  - Lembretes em minutos
+  - Visibilidade (Privado/Equipe)
+- **Editar/Excluir:**
+  - Apenas criador ou admin
+  - Modal de confirmação
+  - Validações de permissão
+- **Visualização:**
+  - Cards no calendário
+  - Modal de detalhes
+  - Filtros automáticos
+
+### ✅ Sistema de Lembretes
+- **Notificações In-App:**
+  - Criação automática antes do evento
+  - Sistema de não lidas
+  - Marcar como lida
+  - Interface de notificações
+- **Configuração:**
+  - Minutos antes do evento
+  - Personalização por agendamento
+  - Sistema de envio automático
+- **Email (Futuro):**
+  - Integração com serviço de email
+  - Templates personalizados
+  - Configuração de horários
+
+### ✅ Controle de Visibilidade
+- **Privado:**
+  - Apenas criador visualiza
+  - Não aparece para equipe
+  - Permissões restritas
+- **Equipe:**
+  - Todos da empresa visualizam
+  - Compartilhamento automático
+  - Colaboração entre membros
+- **Permissões:**
+  - Criador: acesso total
+  - Admin: acesso total
+  - Usuário: apenas visualização
+
+### ✅ Interface e UX
+- **Design Moderno:**
+  - TailwindCSS responsivo
+  - Modo escuro/claro
+  - Animações suaves
+  - Feedback visual
+- **Modal Interativo:**
+  - Criação/edição intuitiva
+  - Validações em tempo real
+  - Estados de loading
+  - Mensagens de sucesso/erro
+- **Acessibilidade:**
+  - Ícones informativos
+  - Cores contrastantes
+  - Navegação por teclado
+  - Títulos descritivos
+
+### ✅ Tecnologia
+- **Backend:**
+  - Models Prisma dedicados
+  - APIs RESTful completas
+  - Middleware de autenticação
+  - Sistema de notificações
+- **Frontend:**
+  - FullCalendar integrado
+  - Day.js para datas
+  - React hooks modernos
+  - Gerenciamento de estado
+- **Banco de Dados:**
+  - PostgreSQL otimizado
+  - Relações bem definidas
+  - Índices de performance
+  - Migrações versionadas
 - Bloqueio automático
 
 ### ✅ Relatórios

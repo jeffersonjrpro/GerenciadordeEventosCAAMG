@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const EventController = require('../controllers/eventController');
 const GuestController = require('../controllers/guestController');
+const PlanoController = require('../controllers/admin/planoController');
 
 // Rotas públicas - rotas mais específicas primeiro
 router.get('/events/:eventId/preview', EventController.getEventPreview);
@@ -22,5 +23,8 @@ router.post('/rsvp/:qrCode', GuestController.rsvpValidation, GuestController.con
 
 // Gerar QR Code
 router.get('/qr-code/:qrCode', GuestController.generateQRCode);
+
+// Listar planos disponíveis (público)
+router.get('/planos', PlanoController.list);
 
 module.exports = router; 
