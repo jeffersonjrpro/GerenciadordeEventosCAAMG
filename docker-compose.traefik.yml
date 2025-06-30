@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-gerenciador_eventos}
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend Node.js
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres123}@postgres:5432/${DATABASE_NAME:-gerenciador_eventos}
+      JWT_SECRET: ${JWT_SECRET:-sua_chave_jwt_super_secreta_aqui}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-seu_email@gmail.com}
+      SMTP_PASS: ${SMTP_PASS:-sua_senha_app}
+      FRONTEND_URL: ${FRONTEND_URL:-https://eventos.seudominio.com}
+    volumes:
+      - uploads:/app/uploads
+      - temp:/app/temp
+    networks:
+      - app-network
+      - traefik
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/public/planos"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eventos-backend.rule=Host(`${DOMAIN:-eventos.seudominio.com}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.eventos-backend.entrypoints=websecure"
+      - "traefik.http.routers.eventos-backend.tls=true"
+      - "traefik.http.services.eventos-backend.loadbalancer.server.port=3001"
+      - "traefik.docker.network=traefik"
+      
+      # Rota para uploads
+      - "traefik.http.routers.eventos-uploads.rule=Host(`${DOMAIN:-eventos.seudominio.com}`) && PathPrefix(`/uploads/`)"
+      - "traefik.http.routers.eventos-uploads.entrypoints=websecure"
+      - "traefik.http.routers.eventos-uploads.tls=true"
+      
+      # Rota para QR codes
+      - "traefik.http.routers.eventos-qr.rule=Host(`${DOMAIN:-eventos.seudominio.com}`) && PathPrefix(`/qr-code/`)"
+      - "traefik.http.routers.eventos-qr.entrypoints=websecure"
+      - "traefik.http.routers.eventos-qr.tls=true"
+
+  # Frontend React
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${FRONTEND_URL:-https://eventos.seudominio.com}
+    restart: unless-stopped
+    networks:
+      - app-network
+      - traefik
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eventos-frontend.rule=Host(`${DOMAIN:-eventos.seudominio.com}`)"
+      - "traefik.http.routers.eventos-frontend.entrypoints=websecure"
+      - "traefik.http.routers.eventos-frontend.tls=true"
+      - "traefik.http.services.eventos-frontend.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik"
+      
+      # Redirecionamento HTTP para HTTPS
+      - "traefik.http.routers.eventos-frontend-http.rule=Host(`${DOMAIN:-eventos.seudominio.com}`)"
+      - "traefik.http.routers.eventos-frontend-http.entrypoints=web"
+      - "traefik.http.routers.eventos-frontend-http.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads:
+    driver: local
+  temp:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+  traefik:
+    external: true 

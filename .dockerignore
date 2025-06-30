@@ -1,0 +1,39 @@
+# Dependências
+node_modules
+npm-debug.log*
+
+# Arquivos de desenvolvimento
+.git
+.gitignore
+*.md
+.env*
+!.env.production
+
+# Arquivos temporários
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Arquivos de build (frontend)
+build
+dist
+
+# Arquivos de teste
+coverage
+.nyc_output
+
+# Arquivos específicos do projeto
+backend/uploads/*
+backend/temp/*
+!backend/uploads/.gitkeep
+!backend/temp/.gitkeep
+
+# Docker
+Dockerfile*
+docker-compose* 
