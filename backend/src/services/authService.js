@@ -99,6 +99,11 @@ class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      nivel: user.nivel,
+      empresaId: user.empresaId,
+      telefone: user.telefone,
+      nomeEmpresa: user.nomeEmpresa,
+      trabalharTodosEventos: user.trabalharTodosEventos,
       createdAt: user.createdAt,
       lastLoginAt: new Date()
     };

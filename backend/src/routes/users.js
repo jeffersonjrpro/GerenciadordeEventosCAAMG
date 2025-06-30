@@ -49,8 +49,26 @@ router.get('/empresas/:empresaId/plano', authenticateToken, async (req, res) => 
 });
 
 // Rota para buscar faturas da empresa
-router.get('/empresas/:empresaId/faturas', authenticateToken, (req, res) => {
-  res.json({ success: true, message: 'Rota funcionando' });
+router.get('/empresas/:empresaId/faturas', authenticateToken, async (req, res) => {
+  try {
+    const { empresaId } = req.params;
+    const user = req.user;
+    
+    // Verificar se o usuário tem acesso à empresa
+    if (!user || user.empresaId !== empresaId) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    const faturas = await prisma.fatura.findMany({
+      where: { empresaId },
+      orderBy: { criadoEm: 'desc' }
+    });
+    
+    res.json({ data: faturas });
+  } catch (err) {
+    console.error('Erro ao buscar faturas:', err);
+    res.status(500).json({ error: 'Erro ao buscar faturas da empresa' });
+  }
 });
 
 // Rotas para gerenciamento de equipe

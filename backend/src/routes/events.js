@@ -36,6 +36,7 @@ router.use(requireOrganizer);
 router.post('/', uploadEventImage, handleUploadError, EventController.createEventValidation, EventController.createEvent);
 router.get('/my-events', EventController.getUserEvents);
 router.get('/stats', EventController.getUserStats);
+router.get('/estatisticas', EventController.getEventStatistics);
 router.get('/:eventId', EventController.getEventById);
 router.put('/:eventId', isEventEditor, uploadEventImage, handleUploadError, EventController.eventValidation, EventController.updateEvent);
 router.put('/:eventId/custom-fields', isEventEditor, EventController.customFieldsValidation, EventController.updateEvent);

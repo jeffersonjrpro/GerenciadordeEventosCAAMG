@@ -508,6 +508,94 @@ class EventService {
     };
   }
 
+  // Buscar estatísticas de eventos para dashboard
+  static async getEventStatistics(userId, empresaId) {
+    try {
+      // Buscar usuário para verificar permissões
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      let where = {};
+
+      if (user.role === 'ORGANIZER') {
+        if (user.trabalharTodosEventos) {
+          where.empresaId = empresaId;
+        } else if (user.eventosIds && user.eventosIds.length > 0) {
+          where.id = { in: user.eventosIds };
+        } else {
+          where.id = -1; // Não retorna nenhum evento
+        }
+      } else {
+        // Admin ou criador: eventos da empresa ou criados pelo usuário
+        where = empresaId ? { empresaId } : { userId };
+      }
+
+      const now = new Date();
+      
+      const [
+        total,
+        ativos,
+        inativos,
+        concluidos,
+        emAndamento,
+        futuros
+      ] = await Promise.all([
+        // Total de eventos
+        prisma.event.count({ where }),
+        
+        // Eventos ativos
+        prisma.event.count({ 
+          where: { ...where, isActive: true } 
+        }),
+        
+        // Eventos inativos
+        prisma.event.count({ 
+          where: { ...where, isActive: false } 
+        }),
+        
+        // Eventos concluídos (data passou e ativos)
+        prisma.event.count({ 
+          where: { 
+            ...where, 
+            isActive: true,
+            date: { lt: now }
+          } 
+        }),
+        
+        // Eventos em andamento (hoje)
+        prisma.event.count({ 
+          where: { 
+            ...where, 
+            isActive: true,
+            date: {
+              gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+              lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+            }
+          } 
+        }),
+        
+        // Eventos futuros
+        prisma.event.count({ 
+          where: { 
+            ...where, 
+            isActive: true,
+            date: { gt: now }
+          } 
+        })
+      ]);
+
+      return {
+        total,
+        ativos,
+        inativos,
+        concluidos,
+        emAndamento,
+        futuros
+      };
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas de eventos:', error);
+      throw error;
+    }
+  }
+
   // Buscar evento público (para RSVP)
   static async getPublicEvent(eventId) {
     const event = await prisma.event.findFirst({

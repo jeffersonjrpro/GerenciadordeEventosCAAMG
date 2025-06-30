@@ -43,9 +43,9 @@ const Layout = () => {
   const [eventoSelecionado, setEventoSelecionado] = useState('');
   const [modalTipo, setModalTipo] = useState('checkin'); // 'checkin' ou 'convidados'
 
-  // Filtrar menus para ORGANIZER
+  // Filtrar menus baseado no nível do usuário
   let filteredNavigation = [...navigation];
-  if (user?.role === 'ORGANIZER') {
+  if (user?.role === 'ORGANIZER' || (user?.nivel && !['ADMIN', 'PROPRIETARIO'].includes(user.nivel))) {
     filteredNavigation = filteredNavigation.filter(
       (item) => item.name !== 'Plano & Faturas' && item.name !== 'Gerenciar Equipe'
     );

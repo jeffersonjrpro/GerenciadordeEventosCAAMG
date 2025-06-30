@@ -416,6 +416,21 @@ class EventController {
     }
   }
 
+  // Buscar estatísticas de eventos do usuário
+  static async getEventStatistics(req, res) {
+    try {
+      const stats = await EventService.getEventStatistics(req.user.id, req.user.empresaId);
+
+      res.json(stats);
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas de eventos:', error);
+      
+      res.status(500).json({
+        error: 'Erro interno do servidor'
+      });
+    }
+  }
+
   // Buscar evento público
   static async getPublicEvent(req, res) {
     try {
