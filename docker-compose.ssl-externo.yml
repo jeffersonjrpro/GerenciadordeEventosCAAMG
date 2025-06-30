@@ -1,4 +1,4 @@
-
+version: '3.8'
 
 services:
   # Banco de dados PostgreSQL
@@ -83,7 +83,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.eventos-frontend.rule=Host(`${DOMAIN:-eventos.seudominio.com}`)"
+      - "traefik.http.routers.eventos-frontend.rule=Host(`${DOMAIN:-eventos.caamg.com.br}`)"
       - "traefik.http.routers.eventos-frontend.entrypoints=websecure"
       - "traefik.http.routers.eventos-frontend.tls=true"
       - "traefik.http.services.eventos-frontend.loadbalancer.server.port=80"
