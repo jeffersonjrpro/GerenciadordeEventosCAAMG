@@ -478,7 +478,9 @@ class EventService {
 
   // Obter estatísticas gerais do usuário
   static async getUserStats(userId) {
-    const [events, totalGuests, totalConfirmed, totalCheckedIn] = await Promise.all([
+    const now = new Date();
+    
+    const [events, totalGuests, totalConfirmed, totalCheckedIn, eventosAtivos, eventosEmAndamento, eventosConcluidos] = await Promise.all([
       prisma.event.count({ where: { userId } }),
       prisma.guest.count({
         where: {
@@ -495,11 +497,37 @@ class EventService {
         where: {
           event: { userId }
         }
+      }),
+      // Eventos ativos
+      prisma.event.count({ 
+        where: { userId, isActive: true } 
+      }),
+      // Eventos em andamento (hoje)
+      prisma.event.count({ 
+        where: { 
+          userId, 
+          isActive: true,
+          date: {
+            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+          }
+        } 
+      }),
+      // Eventos concluídos (data passou e ativos)
+      prisma.event.count({ 
+        where: { 
+          userId, 
+          isActive: true,
+          date: { lt: now }
+        } 
       })
     ]);
 
     return {
       totalEvents: events,
+      eventosAtivos,
+      eventosEmAndamento,
+      eventosConcluidos,
       totalGuests,
       totalConfirmed,
       totalCheckedIn,

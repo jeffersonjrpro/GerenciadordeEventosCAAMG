@@ -419,11 +419,18 @@ class EventController {
   // Buscar estatísticas de eventos do usuário
   static async getEventStatistics(req, res) {
     try {
+      console.log('=== DEBUG ESTATISTICAS ===');
+      console.log('req.user:', req.user);
+      console.log('user.id:', req.user.id);
+      console.log('user.empresaId:', req.user.empresaId);
+      
       const stats = await EventService.getEventStatistics(req.user.id, req.user.empresaId);
 
+      console.log('Estatísticas calculadas:', stats);
       res.json(stats);
     } catch (error) {
       console.error('Erro ao buscar estatísticas de eventos:', error);
+      console.error('Stack trace:', error.stack);
       
       res.status(500).json({
         error: 'Erro interno do servidor'

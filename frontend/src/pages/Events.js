@@ -49,10 +49,26 @@ const Events = () => {
 
   const carregarEstatisticas = async () => {
     try {
-      const response = await api.get('/events/estatisticas');
-      setEstatisticas(response.data);
+      // Usar a mesma API que funciona no dashboard
+      const response = await api.get('/events/stats');
+      const stats = response.data.data;
+      
+      // Converter para o formato esperado pelos cards
+      setEstatisticas({
+        total: stats.totalEvents || 0,
+        ativos: stats.eventosAtivos || 0,
+        emAndamento: stats.eventosEmAndamento || 0,
+        concluidos: stats.eventosConcluidos || 0
+      });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
+      // Fallback para valores zero
+      setEstatisticas({
+        total: 0,
+        ativos: 0,
+        emAndamento: 0,
+        concluidos: 0
+      });
     }
   };
 

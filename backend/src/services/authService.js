@@ -70,7 +70,23 @@ class AuthService {
 
     // Buscar usuário
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+        role: true,
+        nivel: true,
+        empresaId: true,
+        telefone: true,
+        nomeEmpresa: true,
+        trabalharTodosEventos: true,
+        eventosIds: true,
+        ativo: true,
+        podeGerenciarDemandas: true,
+        createdAt: true
+      }
     });
 
     if (!user) {
@@ -104,6 +120,9 @@ class AuthService {
       telefone: user.telefone,
       nomeEmpresa: user.nomeEmpresa,
       trabalharTodosEventos: user.trabalharTodosEventos,
+      eventosIds: user.eventosIds,
+      ativo: user.ativo,
+      podeGerenciarDemandas: user.podeGerenciarDemandas,
       createdAt: user.createdAt,
       lastLoginAt: new Date()
     };
