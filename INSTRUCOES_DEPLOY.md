@@ -18,28 +18,33 @@ ssh root@seu-servidor
 cd /opt/gerenciador-eventos
 ```
 
-### 3. Pare os containers atuais
+### 3. Atualize o código (se necessário)
+```bash
+git pull
+```
+
+### 4. Pare os containers atuais
 ```bash
 docker-compose down
 ```
 
-### 4. Remova containers antigos (se houver)
+### 5. Remova containers antigos (se houver)
 ```bash
 docker-compose rm -f
 ```
 
-### 5. Torne o script executável e execute
+### 6. Torne o script executável e execute
 ```bash
 chmod +x restart-containers.sh
 ./restart-containers.sh
 ```
 
-### 6. Verifique o status dos containers
+### 7. Verifique o status dos containers
 ```bash
 docker-compose ps
 ```
 
-### 7. Verifique os logs se necessário
+### 8. Verifique os logs se necessário
 ```bash
 # Logs do frontend
 docker-compose logs frontend
@@ -57,6 +62,18 @@ O Traefik está configurado para:
 - **Frontend**: `https://eventos.caamg.com.br` (porta 3000)
 - **Backend**: `https://eventos.caamg.com.br/api/` (porta 3001)
 - **SSL/TLS**: Automático via Let's Encrypt
+
+## 🔧 Correções Aplicadas
+
+### Problema do Cadastro
+- ✅ **Corrigido**: `REACT_APP_API_URL` agora aponta para `https://eventos.caamg.com.br/api`
+- ✅ **Resultado**: O frontend agora faz requisições corretas para `/api/auth/register`
+
+### Estrutura das URLs
+```
+Frontend: https://eventos.caamg.com.br/
+API:      https://eventos.caamg.com.br/api/
+```
 
 ## 🔍 Troubleshooting
 
@@ -85,6 +102,22 @@ O Traefik está configurado para:
 2. Verifique se o banco PostgreSQL está acessível:
    ```bash
    docker-compose exec postgres pg_isready -U postgres
+   ```
+
+### Se o cadastro não funcionar:
+1. Verifique se a API está respondendo:
+   ```bash
+   curl https://eventos.caamg.com.br/api/health
+   ```
+
+2. Verifique os logs do frontend:
+   ```bash
+   docker-compose logs frontend
+   ```
+
+3. Verifique os logs do backend:
+   ```bash
+   docker-compose logs backend
    ```
 
 ### Se o domínio não carregar:

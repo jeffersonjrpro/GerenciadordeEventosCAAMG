@@ -18,4 +18,13 @@ docker-compose ps
 echo "🔍 Verificando logs do Traefik..."
 docker logs traefik --tail 20
 
-echo "✅ Processo concluído!" 
+echo "🧪 Testando API..."
+echo "Testando endpoint de health:"
+curl -s https://eventos.caamg.com.br/api/health || echo "❌ API não responde"
+
+echo ""
+echo "✅ Processo concluído!"
+echo ""
+echo "🌐 URLs da aplicação:"
+echo "   Frontend: https://eventos.caamg.com.br"
+echo "   API:      https://eventos.caamg.com.br/api" 

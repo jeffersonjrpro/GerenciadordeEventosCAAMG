@@ -78,7 +78,7 @@ services:
         npx serve -s build -l 3000
       "
     environment:
-      REACT_APP_API_URL: https://eventos.caamg.com.br
+      REACT_APP_API_URL: https://eventos.caamg.com.br/api
     networks:
       - app-network
       - traefik_default
