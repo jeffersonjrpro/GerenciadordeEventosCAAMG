@@ -167,6 +167,7 @@ model User {
   demandasCriadas  Demanda[] @relation("UserCriadorDemanda")
   agendamentosCriados Agendamento[] @relation("UserAgendamentosCriados")
   notifications Notification[]
+  observacoesCriadas Observacao[] @relation("ObservacoesDoAutor")
   @@map("users")
 }
 
@@ -178,6 +179,7 @@ model Event {
   location    String
   maxGuests   Int?
   imageUrl    String?
+  customSlug  String?  @unique // URL personalizada para o evento
   isActive    Boolean  @default(true)
   isPublic    Boolean  @default(false)
   registrationPaused Boolean @default(false)  // Pausar inscrições manualmente
@@ -380,20 +382,10 @@ model Observacao {
   texto      String
   data       DateTime @default(now())
   autorId    String
-  autor      Usuario  @relation("ObservacoesDoAutor", fields: [autorId], references: [id])
+  autor      User     @relation("ObservacoesDoAutor", fields: [autorId], references: [id])
   demandaId  String
   demanda    Demanda  @relation(fields: [demandaId], references: [id])
   @@map("observacoes")
-}
-
-model Usuario {
-  id       String   @id @default(uuid())
-  nome     String
-  email    String   @unique
-  empresaId String
-  observacoesCriadas Observacao[] @relation("ObservacoesDoAutor")
-  podeGerenciarDemandas Boolean @default(false)
-  @@map("usuarios")
 }
 
 // ===== AGENDAMENTOS =====

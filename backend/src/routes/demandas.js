@@ -92,87 +92,190 @@ async function proximoNumeroSolicitacao() {
 
 // Criar demanda (apenas admin)
 router.post('/demandas', authenticateToken, async (req, res) => {
-  const user = req.user;
-  if (user.nivel !== 'ADMIN' && user.nivel !== 'PROPRIETARIO' && !user.podeGerenciarDemandas) return res.status(403).json({ error: 'Acesso negado' });
-  const { nomeProjeto, descricao, solicitante, prioridade, status, dataEntrega, dataTermino, setorId, responsaveisIds, observacoesIniciais, linkPastaProjeto, linkSite, numeroFluig } = req.body;
-  if (!setorId) {
-    return res.status(400).json({ error: 'O campo setorId é obrigatório.' });
-  }
-  // Validação dos responsáveis
-  let connectResponsaveis = [];
-  if (responsaveisIds && responsaveisIds.length) {
-    const idsArray = Array.isArray(responsaveisIds) ? responsaveisIds : [responsaveisIds];
-    const count = await prisma.user.count({ where: { id: { in: idsArray } } });
-    if (count !== idsArray.length) {
-      return res.status(400).json({ error: 'Um ou mais responsáveis não existem.' });
+  try {
+    console.log('🔍 POST /demandas - Iniciando criação');
+    console.log('🔍 POST /demandas - Dados recebidos:', req.body);
+    
+    const user = req.user;
+    if (user.nivel !== 'ADMIN' && user.nivel !== 'PROPRIETARIO' && !user.podeGerenciarDemandas) {
+      console.log('❌ POST /demandas - Acesso negado para usuário:', user.id);
+      return res.status(403).json({ error: 'Acesso negado' });
     }
-    connectResponsaveis = idsArray.map(id => ({ id }));
-  }
-  // Validação do setor
-  const setorExiste = await prisma.setor.findUnique({ where: { id: setorId } });
-  if (!setorExiste) {
-    return res.status(400).json({ error: 'Setor não encontrado.' });
-  }
-  const numeroSolicitacao = await proximoNumeroSolicitacao();
-  const demanda = await prisma.demanda.create({
-    data: {
+    
+    const { nomeProjeto, descricao, solicitante, prioridade, status, dataEntrega, dataTermino, setorId, responsaveisIds, observacoesIniciais, linkPastaProjeto, linkSite, numeroFluig } = req.body;
+    
+    console.log('🔍 POST /demandas - setorId:', setorId);
+    
+    if (!setorId) {
+      console.log('❌ POST /demandas - setorId é obrigatório');
+      return res.status(400).json({ error: 'O campo setorId é obrigatório.' });
+    }
+    
+    // Validação dos responsáveis
+    let connectResponsaveis = [];
+    if (responsaveisIds && responsaveisIds.length) {
+      const idsArray = Array.isArray(responsaveisIds) ? responsaveisIds : [responsaveisIds];
+      const count = await prisma.user.count({ where: { id: { in: idsArray } } });
+      if (count !== idsArray.length) {
+        console.log('❌ POST /demandas - Responsáveis não encontrados');
+        return res.status(400).json({ error: 'Um ou mais responsáveis não existem.' });
+      }
+      connectResponsaveis = idsArray.map(id => ({ id }));
+    }
+    
+    // Validação do setor
+    const setorExiste = await prisma.setor.findUnique({ where: { id: setorId } });
+    if (!setorExiste) {
+      console.log('❌ POST /demandas - Setor não encontrado:', setorId);
+      return res.status(400).json({ error: 'Setor não encontrado.' });
+    }
+    
+    console.log('🔍 POST /demandas - Gerando número de solicitação');
+    const numeroSolicitacao = await proximoNumeroSolicitacao();
+    console.log('🔍 POST /demandas - Número gerado:', numeroSolicitacao);
+    
+    // Processar observações se fornecidas
+    let observacoesData = undefined;
+    if (observacoesIniciais && observacoesIniciais.length > 0) {
+      // Filtrar apenas observações que têm texto
+      const observacoesValidas = observacoesIniciais.filter(obs => obs.texto && obs.texto.trim());
+      if (observacoesValidas.length > 0) {
+        observacoesData = {
+          create: observacoesValidas.map(obs => ({ 
+            texto: obs.texto.trim(), 
+            autorId: obs.autorId || user.id 
+          }))
+        };
+      }
+    }
+    
+    console.log('🔍 POST /demandas - Dados para criação:', {
       solicitacao: String(numeroSolicitacao),
-      numeroFluig: numeroFluig || null,
       nomeProjeto,
-      descricao: descricao || null,
       solicitante,
       prioridade: prioridade || 'MEDIA',
       status: status || 'ABERTO',
-      dataAbertura: new Date(),
-      dataEntrega: dataEntrega ? new Date(dataEntrega + 'T00:00:00') : null,
-      dataTermino: dataTermino ? new Date(dataTermino) : null,
-      linkPastaProjeto,
-      linkSite,
       setorId,
-      responsaveis: { connect: connectResponsaveis },
-      observacoes: observacoesIniciais?.length
-        ? { create: observacoesIniciais.map(obs => ({ texto: obs.texto, autorId: obs.autorId })) }
-        : undefined,
-      criadoPorId: user.id
-    },
-    include: { setor: true, responsaveis: true, observacoes: true }
-  });
-  res.json(demanda);
+      criadoPorId: user.id,
+      observacoesData
+    });
+    
+    const demanda = await prisma.demanda.create({
+      data: {
+        solicitacao: String(numeroSolicitacao),
+        numeroFluig: numeroFluig || null,
+        nomeProjeto,
+        descricao: descricao || null,
+        solicitante,
+        prioridade: prioridade || 'MEDIA',
+        status: status || 'ABERTO',
+        dataAbertura: new Date(),
+        dataEntrega: dataEntrega ? new Date(dataEntrega + 'T00:00:00') : null,
+        dataTermino: dataTermino ? new Date(dataTermino) : null,
+        linkPastaProjeto,
+        linkSite,
+        setorId,
+        responsaveis: { connect: connectResponsaveis },
+        ...(observacoesData && { observacoes: observacoesData }),
+        criadoPorId: user.id
+      },
+      include: { setor: true, responsaveis: true, observacoes: true }
+    });
+    
+    console.log('✅ POST /demandas - Demanda criada com sucesso:', demanda.id);
+    res.json(demanda);
+  } catch (error) {
+    console.error('❌ POST /demandas - Erro ao criar demanda:', error);
+    console.error('❌ POST /demandas - Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 });
 
 // Editar demanda (apenas admin)
 router.put('/demandas/:id', authenticateToken, async (req, res) => {
-  const user = req.user;
-  if (user.nivel !== 'ADMIN' && user.nivel !== 'PROPRIETARIO' && !user.podeGerenciarDemandas) return res.status(403).json({ error: 'Acesso negado' });
-  const { nomeProjeto, descricao, solicitante, prioridade, status, dataEntrega, setorId, responsaveisIds, numeroFluig, linkPastaProjeto, linkSite } = req.body;
-  // Validação dos responsáveis
-  let setResponsaveis = [];
-  if (responsaveisIds && responsaveisIds.length) {
-    const idsArray = Array.isArray(responsaveisIds) ? responsaveisIds : [responsaveisIds];
-    const count = await prisma.user.count({ where: { id: { in: idsArray } } });
-    if (count !== idsArray.length) {
-      return res.status(400).json({ error: 'Um ou mais responsáveis não existem.' });
+  try {
+    console.log('🔍 PUT /demandas/:id - Iniciando edição');
+    console.log('🔍 PUT /demandas/:id - ID:', req.params.id);
+    console.log('🔍 PUT /demandas/:id - Dados recebidos:', req.body);
+    
+    const user = req.user;
+    if (user.nivel !== 'ADMIN' && user.nivel !== 'PROPRIETARIO' && !user.podeGerenciarDemandas) {
+      console.log('❌ PUT /demandas/:id - Acesso negado para usuário:', user.id);
+      return res.status(403).json({ error: 'Acesso negado' });
     }
-    setResponsaveis = idsArray.map(id => ({ id }));
-  }
-  const demanda = await prisma.demanda.update({
-    where: { id: req.params.id },
-    data: {
+    
+    const { nomeProjeto, descricao, solicitante, prioridade, status, dataEntrega, setorId, responsaveisIds, numeroFluig, linkPastaProjeto, linkSite, observacoesIniciais } = req.body;
+    
+    // Validação dos responsáveis
+    let setResponsaveis = [];
+    if (responsaveisIds && responsaveisIds.length) {
+      const idsArray = Array.isArray(responsaveisIds) ? responsaveisIds : [responsaveisIds];
+      const count = await prisma.user.count({ where: { id: { in: idsArray } } });
+      if (count !== idsArray.length) {
+        console.log('❌ PUT /demandas/:id - Responsáveis não encontrados');
+        return res.status(400).json({ error: 'Um ou mais responsáveis não existem.' });
+      }
+      setResponsaveis = idsArray.map(id => ({ id }));
+    }
+
+    // Processar observações se fornecidas
+    let observacoesData = undefined;
+    if (observacoesIniciais && observacoesIniciais.length > 0) {
+      // Filtrar apenas observações que têm texto
+      const observacoesValidas = observacoesIniciais.filter(obs => obs.texto && obs.texto.trim());
+      if (observacoesValidas.length > 0) {
+        observacoesData = {
+          create: observacoesValidas.map(obs => ({ 
+            texto: obs.texto.trim(), 
+            autorId: obs.autorId || user.id 
+          }))
+        };
+      }
+    }
+
+    console.log('🔍 PUT /demandas/:id - Dados para atualização:', {
       nomeProjeto,
-      descricao: descricao || null,
       solicitante,
       prioridade,
       status,
-      dataEntrega: new Date(dataEntrega),
       setorId,
-      responsaveis: { set: setResponsaveis },
-      numeroFluig: numeroFluig || null,
-      linkPastaProjeto: linkPastaProjeto || null,
-      linkSite: linkSite || null
-    },
-    include: { setor: true, responsaveis: true, observacoes: true }
-  });
-  res.json(demanda);
+      observacoesData
+    });
+
+    const demanda = await prisma.demanda.update({
+      where: { id: req.params.id },
+      data: {
+        nomeProjeto,
+        descricao: descricao || null,
+        solicitante,
+        prioridade,
+        status,
+        dataEntrega: new Date(dataEntrega),
+        setorId,
+        responsaveis: { set: setResponsaveis },
+        numeroFluig: numeroFluig || null,
+        linkPastaProjeto: linkPastaProjeto || null,
+        linkSite: linkSite || null,
+        ...(observacoesData && { observacoes: observacoesData })
+      },
+      include: { setor: true, responsaveis: true, observacoes: { include: { autor: true } } }
+    });
+    
+    console.log('✅ PUT /demandas/:id - Demanda atualizada com sucesso:', demanda.id);
+    res.json(demanda);
+  } catch (error) {
+    console.error('❌ PUT /demandas/:id - Erro ao atualizar demanda:', error);
+    console.error('❌ PUT /demandas/:id - Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 });
 
 // Estatísticas de demandas por status (DEVE VIR ANTES DE /:id)

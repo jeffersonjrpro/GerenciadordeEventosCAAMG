@@ -4,12 +4,60 @@ const { v4: uuidv4 } = require('uuid');
 const OrganizerService = require('./organizerService');
 
 class EventService {
+  // Gerar slug personalizado baseado no nome do evento
+  static generateCustomSlug(name) {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+      .replace(/\s+/g, '-') // Substitui espaços por hífens
+      .replace(/-+/g, '-') // Remove hífens duplicados
+      .trim('-'); // Remove hífens no início e fim
+  }
+
+  // Verificar se um slug já existe
+  static async isSlugAvailable(slug, excludeEventId = null) {
+    const where = { customSlug: slug };
+    if (excludeEventId) {
+      where.id = { not: excludeEventId };
+    }
+    
+    const existingEvent = await prisma.event.findFirst({ where });
+    return !existingEvent;
+  }
+
+  // Gerar slug único
+  static async generateUniqueSlug(name, excludeEventId = null) {
+    let baseSlug = this.generateCustomSlug(name);
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (!(await this.isSlugAvailable(slug, excludeEventId))) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    return slug;
+  }
+
   // Criar novo evento
   static async createEvent(userId, eventData) {
-    const { name, description, date, location, maxGuests, customFields, companyId } = eventData;
+    const { name, description, date, location, maxGuests, customFields, companyId, customSlug } = eventData;
 
     // Buscar o usuário para pegar o empresaId
     const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    // Gerar slug se não foi fornecido
+    let finalSlug = customSlug;
+    if (!finalSlug) {
+      finalSlug = await this.generateUniqueSlug(name);
+    } else {
+      // Verificar se o slug fornecido está disponível
+      if (!(await this.isSlugAvailable(finalSlug))) {
+        throw new Error('URL personalizada já está em uso');
+      }
+    }
 
     const event = await prisma.event.create({
       data: {
@@ -19,6 +67,7 @@ class EventService {
         location,
         maxGuests: maxGuests ? parseInt(maxGuests) : null,
         customFields: customFields || {},
+        customSlug: finalSlug,
         isPublic: true,
         userId,
         companyId,
@@ -381,11 +430,20 @@ class EventService {
 
     console.log('EventService.updateEvent - Evento encontrado:', existingEvent.id);
 
-    const { name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl } = updateData;
+    const { name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl, customSlug } = updateData;
 
     console.log('EventService.updateEvent - Dados para atualização:', {
-      name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl
+      name, description, date, location, maxGuests, isActive, isPublic, customFields, imageUrl, customSlug
     });
+
+    // Validar customSlug se foi fornecido
+    let finalSlug = existingEvent.customSlug;
+    if (customSlug !== undefined && customSlug !== existingEvent.customSlug) {
+      if (customSlug && !(await this.isSlugAvailable(customSlug, eventId))) {
+        throw new Error('URL personalizada já está em uso');
+      }
+      finalSlug = customSlug || null;
+    }
 
     const event = await prisma.event.update({
       where: { id: eventId },
@@ -398,7 +456,8 @@ class EventService {
         ...(isActive !== undefined && { isActive: isActive === 'true' || isActive === true }),
         ...(isPublic !== undefined && { isPublic: isPublic === 'true' || isPublic === true }),
         ...(customFields !== undefined && { customFields }),
-        ...(imageUrl && { imageUrl: imageUrl || null })
+        ...(imageUrl && { imageUrl: imageUrl || null }),
+        ...(finalSlug !== existingEvent.customSlug && { customSlug: finalSlug })
       },
       include: {
         user: {
@@ -645,6 +704,7 @@ class EventService {
         formConfig: true,
         publicPageConfig: true,
         imageUrl: true,
+        customSlug: true,
         user: {
           select: {
             name: true
@@ -684,6 +744,7 @@ class EventService {
         formConfig: true,
         publicPageConfig: true,
         imageUrl: true,
+        customSlug: true,
         user: {
           select: {
             name: true
@@ -1206,6 +1267,88 @@ class EventService {
     });
 
     return updatedEvent.publicPageConfig;
+  }
+
+  // Buscar evento público por slug
+  static async getPublicEventBySlug(slug) {
+    const event = await prisma.event.findFirst({
+      where: {
+        customSlug: slug,
+        isActive: true,
+        isPublic: true
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        maxGuests: true,
+        isPublic: true,
+        isActive: true,
+        customFields: true,
+        formConfig: true,
+        publicPageConfig: true,
+        imageUrl: true,
+        customSlug: true,
+        user: {
+          select: {
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            guests: true
+          }
+        }
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado ou não está disponível publicamente');
+    }
+
+    return event;
+  }
+
+  // Obter evento para preview por slug (sem restrições de isActive e isPublic)
+  static async getEventForPreviewBySlug(slug) {
+    const event = await prisma.event.findFirst({
+      where: {
+        customSlug: slug
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        maxGuests: true,
+        isPublic: true,
+        isActive: true,
+        customFields: true,
+        formConfig: true,
+        publicPageConfig: true,
+        imageUrl: true,
+        customSlug: true,
+        user: {
+          select: {
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            guests: true
+          }
+        }
+      }
+    });
+
+    if (!event) {
+      throw new Error('Evento não encontrado');
+    }
+
+    return event;
   }
 }
 

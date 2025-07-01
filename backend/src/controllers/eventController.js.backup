@@ -1058,7 +1058,6 @@ class EventController {
         message: 'Erro interno do servidor'
       });
     }
-  }
 
   // Buscar configuração do formulário público por slug
   static async getPublicFormConfigBySlug(req, res) {
