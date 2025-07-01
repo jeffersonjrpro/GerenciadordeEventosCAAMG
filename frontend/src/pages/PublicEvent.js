@@ -13,7 +13,8 @@ import {
   Phone,
   QrCode,
   Download,
-  Share2
+  Share2,
+  Lock
 } from 'lucide-react';
 
 const PublicEvent = () => {
@@ -28,6 +29,7 @@ const PublicEvent = () => {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [guest, setGuest] = useState(null);
+  const [eventNotAvailable, setEventNotAvailable] = useState(false);
 
   // Verifica se está na rota do formulário
   const isFormOnly = location.pathname.includes('/formulario');
@@ -47,6 +49,8 @@ const PublicEvent = () => {
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
+      setError(null);
+      setEventNotAvailable(false);
       
       // Se for preview, usa a API de preview sem restrições
       const eventEndpoint = isPreview 
@@ -167,6 +171,7 @@ const PublicEvent = () => {
       if (error.response?.status === 404) {
         setError('Evento não encontrado');
       } else if (error.response?.status === 403) {
+        setEventNotAvailable(true);
         setError('Evento não está disponível publicamente');
       } else {
         setError('Erro ao carregar evento. Tente novamente.');
@@ -259,6 +264,28 @@ const PublicEvent = () => {
     );
   }
 
+  // Página de evento não disponível
+  if (eventNotAvailable) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <Lock className="mx-auto h-16 w-16 text-gray-400 mb-6" />
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">Evento Privado</h3>
+          <p className="text-gray-600 mb-8">
+            Este evento não está disponível publicamente no momento. 
+            Entre em contato com o organizador para mais informações.
+          </p>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h4 className="text-lg font-semibold text-gray-800 mb-2">Informações do Evento</h4>
+            <p className="text-gray-600 text-sm">
+              Para acessar este evento, você precisa de permissão do organizador.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error && !event) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -279,117 +306,80 @@ const PublicEvent = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
         <div className="max-w-2xl mx-auto px-4 py-12">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Inscrição Confirmada!
-              </h1>
-              <p className="text-lg text-gray-600">
-                Guarde seu QR Code para o check-in no evento
-              </p>
+          <div className="text-center">
+            <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-6" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Inscrição Confirmada!
+            </h1>
+            <p className="text-lg text-gray-600 mb-8">
+              Sua inscrição para <strong>{event.name}</strong> foi realizada com sucesso.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Dados da Inscrição</h2>
+              <p className="text-gray-600">Guarde essas informações</p>
             </div>
 
-            {/* Informações do Evento */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                {event.name}
-              </h2>
-              <div className="space-y-3">
-                <div className="flex items-center text-gray-700">
-                  <Calendar className="h-5 w-5 mr-3 text-blue-600" />
-                  <span className="font-medium">
-                    {new Date(event.date).toLocaleDateString('pt-BR', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <p className="text-gray-900 font-medium">{guest.name}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <p className="text-gray-900">{guest.email}</p>
+              </div>
+              {guest.phone && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                  <p className="text-gray-900">{guest.phone}</p>
                 </div>
-                {event.location && (
-                  <div className="flex items-center text-gray-700">
-                    <MapPin className="h-5 w-5 mr-3 text-blue-600" />
-                    <span className="font-medium">{event.location}</span>
-                  </div>
-                )}
-                <div className="flex items-center text-gray-700">
-                  <Clock className="h-5 w-5 mr-3 text-blue-600" />
-                  <span className="font-medium">
-                    {new Date(event.date).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Código de Inscrição</label>
+                <p className="text-gray-900 font-mono">{guest.id}</p>
               </div>
             </div>
 
-            {/* Informações do Convidado */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-8">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">
-                Suas Informações
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center text-gray-700">
-                  <User className="h-5 w-5 mr-3 text-green-600" />
-                  <span className="font-medium">{guest.name}</span>
+            {guest.qrCodeImage && (
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Seu QR Code</h3>
+                <div className="inline-block bg-white p-4 rounded-lg shadow-md">
+                  <img
+                    src={guest.qrCodeImage}
+                    alt="QR Code"
+                    className="w-32 h-32 mx-auto"
+                  />
                 </div>
-                {guest.email && (
-                  <div className="flex items-center text-gray-700">
-                    <Mail className="h-5 w-5 mr-3 text-green-600" />
-                    <span>{guest.email}</span>
-                  </div>
-                )}
-                {guest.phone && (
-                  <div className="flex items-center text-gray-700">
-                    <Phone className="h-5 w-5 mr-3 text-green-600" />
-                    <span>{guest.phone}</span>
-                  </div>
-                )}
+                <div className="mt-4 space-x-4">
+                  <button
+                    onClick={downloadQRCode}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Baixar QR Code
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* QR Code */}
             <div className="text-center">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">
-                Seu QR Code de Acesso
-              </h3>
-              <div className="bg-white border-4 border-gray-200 rounded-2xl p-6 inline-block mb-6">
-                <img
-                  src={guest.qrCodeImage}
-                  alt="QR Code"
-                  className="w-48 h-48"
-                  onError={(e) => {
-                    console.error('❌ Erro ao carregar QR Code:', e.target.src);
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-              <p className="text-sm text-gray-600 mb-2">
-                Código: <span className="font-mono font-bold">{guest.qrCode}</span>
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                Apresente este QR Code no momento do check-in do evento
-              </p>
-              
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={downloadQRCode}
-                  className="btn-primary inline-flex items-center"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Baixar QR Code
-                </button>
-                <button
-                  onClick={shareEvent}
-                  className="btn-outline inline-flex items-center"
-                >
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Compartilhar
-                </button>
-              </div>
+              <button
+                onClick={shareEvent}
+                className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Compartilhar Evento
+              </button>
             </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-gray-600">
+              Um email de confirmação foi enviado para <strong>{guest.email}</strong>
+            </p>
           </div>
         </div>
       </div>
