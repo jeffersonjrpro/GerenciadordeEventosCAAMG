@@ -117,7 +117,17 @@ function App() {
               <Route path="/admin/eventos" element={<AdminRoute><AdminLayout><Eventos /></AdminLayout></AdminRoute>} />
               
               {/* Rota 404 */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
+                    <p className="text-xl text-gray-600 mb-8">Página não encontrada</p>
+                    <a href="/login" className="text-blue-600 hover:text-blue-800">
+                      Voltar ao login
+                    </a>
+                  </div>
+                </div>
+              } />
             </Routes>
           </div>
         </AdminAuthProvider>

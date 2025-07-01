@@ -463,6 +463,14 @@ class EventController {
       });
     } catch (error) {
       console.error('❌ Erro ao buscar evento público:', error);
+      
+      if (error.message === 'Evento não encontrado ou não está disponível publicamente') {
+        return res.status(403).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'
@@ -519,6 +527,13 @@ class EventController {
       
       if (error.message === 'Evento não encontrado') {
         return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      if (error.message === 'Evento não encontrado ou não está disponível publicamente') {
+        return res.status(403).json({
           success: false,
           message: error.message
         });

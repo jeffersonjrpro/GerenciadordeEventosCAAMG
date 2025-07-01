@@ -913,7 +913,7 @@ class EventService {
     });
 
     if (!event) {
-      throw new Error('Evento não encontrado');
+      throw new Error('Evento não encontrado ou não está disponível publicamente');
     }
 
     // Se não tem configuração, criar uma padrão

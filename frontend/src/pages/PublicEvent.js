@@ -59,12 +59,23 @@ const PublicEvent = () => {
       
       console.log('🔍 fetchEventDetails - eventEndpoint:', eventEndpoint);
       console.log('🔍 fetchEventDetails - isPreview:', isPreview);
+      console.log('🔍 fetchEventDetails - eventId:', eventId);
       
       // Primeiro tenta carregar o evento
       const eventResponse = await api.get(eventEndpoint);
       console.log('✅ fetchEventDetails - evento carregado:', eventResponse.data);
+      console.log('✅ fetchEventDetails - evento isActive:', eventResponse.data.data?.isActive);
+      console.log('✅ fetchEventDetails - evento isPublic:', eventResponse.data.data?.isPublic);
       
       setEvent(eventResponse.data.data);
+      
+      // Verificação adicional: se não for preview, verificar se o evento está ativo e público
+      if (!isPreview && (!eventResponse.data.data.isActive || !eventResponse.data.data.isPublic)) {
+        console.log('⚠️ fetchEventDetails - evento não está ativo ou público');
+        setEventNotAvailable(true);
+        setError('Evento não está disponível publicamente');
+        return;
+      }
       
       // Depois tenta carregar a configuração do formulário
       try {
@@ -173,6 +184,8 @@ const PublicEvent = () => {
       } else if (error.response?.status === 403) {
         setEventNotAvailable(true);
         setError('Evento não está disponível publicamente');
+      } else if (error.response?.data?.message) {
+        setError(error.response.data.message);
       } else {
         setError('Erro ao carregar evento. Tente novamente.');
       }
@@ -225,6 +238,8 @@ const PublicEvent = () => {
     
     if (!event.isActive) {
       return { status: 'inactive', label: 'Evento Inativo', color: 'text-gray-500', bgColor: 'bg-gray-100' };
+    } else if (!event.isPublic) {
+      return { status: 'private', label: 'Evento Privado', color: 'text-gray-600', bgColor: 'bg-gray-100' };
     } else if (eventDate < now) {
       return { status: 'finished', label: 'Evento Finalizado', color: 'text-gray-600', bgColor: 'bg-gray-100' };
     } else if (eventDate.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
@@ -273,13 +288,30 @@ const PublicEvent = () => {
           <h3 className="text-2xl font-bold text-gray-900 mb-4">Evento Privado</h3>
           <p className="text-gray-600 mb-8">
             Este evento não está disponível publicamente no momento. 
-            Entre em contato com o organizador para mais informações.
+            Isso pode acontecer por alguns motivos:
           </p>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-2">Informações do Evento</h4>
-            <p className="text-gray-600 text-sm">
-              Para acessar este evento, você precisa de permissão do organizador.
-            </p>
+          <div className="bg-white rounded-lg shadow-md p-6 text-left">
+            <h4 className="text-lg font-semibold text-gray-800 mb-4">Possíveis motivos:</h4>
+            <ul className="space-y-2 text-gray-600 text-sm">
+              <li className="flex items-start">
+                <span className="text-red-500 mr-2">•</span>
+                O evento está marcado como privado
+              </li>
+              <li className="flex items-start">
+                <span className="text-red-500 mr-2">•</span>
+                O evento está inativo
+              </li>
+              <li className="flex items-start">
+                <span className="text-red-500 mr-2">•</span>
+                O evento foi removido ou não existe
+              </li>
+            </ul>
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-gray-600 text-sm">
+                Para acessar este evento, você precisa de permissão do organizador.
+                Entre em contato com o organizador para mais informações.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -390,6 +422,62 @@ const PublicEvent = () => {
   // apenas o formulário em tela cheia (ou o card de inscrição na coluna lateral).
   // A lógica de exibição do formulário agora está dentro do layout principal.
 
+  // Se for apenas formulário (URL contém /formulario), mostra apenas o formulário
+  if (isFormOnly) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {pageConfig?.registration?.formTitle || formConfig?.settings?.title || 'Inscrição no Evento'}
+              </h2>
+              <p className="text-gray-600 mt-2">
+                {pageConfig?.registration?.formDescription || formConfig?.settings?.description || 'Preencha os dados abaixo para se inscrever'}
+              </p>
+            </div>
+            
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {formConfig?.fields?.map((field) => (
+                <div key={field.id}>
+                  <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1">
+                    {field.label} {field.required && '*'}
+                  </label>
+                  <input
+                    id={field.id}
+                    type={field.type}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={field.placeholder}
+                    {...register(field.id, {
+                      required: field.required ? `${field.label} é obrigatório` : false,
+                    })}
+                  />
+                  {errors[field.id] && (
+                    <p className="text-red-500 text-sm mt-1">{errors[field.id].message}</p>
+                  )}
+                </div>
+              ))}
+              
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                disabled={submitting} 
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Enviando...' : (formConfig?.settings?.submitButtonText || 'Confirmar Inscrição')}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       '--primary-color': pageConfig?.theme?.primaryColor || '#3B82F6',
@@ -427,7 +515,7 @@ const PublicEvent = () => {
                 )}
               </div>
               <div className="mt-8">
-                {pageConfig?.registration?.showForm && event.isActive && new Date(event.date) > new Date() && (
+                {pageConfig?.registration?.showForm && event.isActive && event.isPublic && new Date(event.date) > new Date() && (
                    <button
                      onClick={() => setShowRegistration(true)}
                      className="btn-primary px-8 py-3 text-lg font-medium"
@@ -435,9 +523,19 @@ const PublicEvent = () => {
                      {pageConfig.registration.buttonText || 'Inscrever-se Agora'}
                    </button>
                 )}
+                {pageConfig?.registration?.showForm && (!event.isActive || !event.isPublic || new Date(event.date) <= new Date()) && (
+                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${status?.bgColor || 'bg-gray-100'} ${status?.color || 'text-gray-600'}`}>
+                    {status?.label || 'Inscrições Indisponíveis'}
+                  </span>
+                )}
                  {status && !pageConfig?.registration?.showForm && (
                    <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${status.bgColor} ${status.color}`}>
                     {status.label}
+                  </span>
+                )}
+                {!pageConfig?.registration?.showForm && !status && (
+                  <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                    Evento Disponível
                   </span>
                 )}
               </div>
@@ -538,12 +636,17 @@ const PublicEvent = () => {
                          <p className="font-semibold">Inscrição Geral</p>
                          <p className="text-sm text-gray-500">Acesso ao evento.</p>
                        </div>
-                       {pageConfig?.registration?.showForm && event.isActive && new Date(event.date) > new Date() ? (
+                       {pageConfig?.registration?.showForm && event.isActive && event.isPublic && new Date(event.date) > new Date() ? (
                          <button onClick={() => setShowRegistration(true)} className="btn-primary">
                            Inscrever-se
                          </button>
                        ) : (
-                         <span className="text-sm font-semibold text-gray-500">Indisponível</span>
+                         <span className="text-sm font-semibold text-gray-500">
+                           {!event.isActive ? 'Evento Inativo' : 
+                            !event.isPublic ? 'Evento Privado' : 
+                            new Date(event.date) <= new Date() ? 'Evento Finalizado' : 
+                            'Indisponível'}
+                         </span>
                        )}
                      </div>
                    </div>
