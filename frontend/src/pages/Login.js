@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo-preta.png';
 
 const Login = () => {
   const { login } = useAuth();
