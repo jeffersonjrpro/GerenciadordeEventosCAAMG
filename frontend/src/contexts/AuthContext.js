@@ -28,7 +28,10 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data.user);
         } catch (error) {
           console.error('Token inválido:', error);
-          logout();
+          // Não redirecionar automaticamente, apenas limpar o token
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem('token');
         }
       }
       setLoading(false);
@@ -80,12 +83,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout
-  const logout = () => {
+  const logout = (redirectToLogin = true) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
-    navigate('/login');
-    toast.success('Logout realizado com sucesso!');
+    if (redirectToLogin) {
+      navigate('/login');
+      toast.success('Logout realizado com sucesso!');
+    }
   };
 
   // Atualizar perfil

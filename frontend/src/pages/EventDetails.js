@@ -587,6 +587,26 @@ const EventDetails = () => {
                 <Download className="h-4 w-4 mr-2" />
                 Exportar Lista
               </button>
+              
+              <button
+                onClick={() => window.open(`${window.location.origin}/event/${eventId}`, '_blank')}
+                className="btn-outline w-full inline-flex items-center justify-center"
+                disabled={!event?.isPublic}
+                title={!event?.isPublic ? 'Evento deve estar público para visualizar' : 'Abrir página pública do evento'}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Ver Página Pública
+              </button>
+              
+              <button
+                onClick={() => window.open(`${window.location.origin}/event/${eventId}/formulario`, '_blank')}
+                className="btn-outline w-full inline-flex items-center justify-center"
+                disabled={!event?.isPublic || !event?.isActive}
+                title={!event?.isPublic ? 'Evento deve estar público para visualizar' : !event?.isActive ? 'Evento deve estar ativo para visualizar' : 'Abrir formulário de inscrição'}
+              >
+                <Type className="h-4 w-4 mr-2" />
+                Ver Formulário
+              </button>
             </div>
           </div>
 

@@ -30,10 +30,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Se o token expirou, redirecionar para login
+    // Se o token expirou, apenas limpar o token sem redirecionar
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Não redirecionar automaticamente - deixar o componente decidir
+      console.log('Token expirado ou inválido, mas não redirecionando automaticamente');
     }
     return Promise.reject(error);
   }
