@@ -225,137 +225,23 @@ const EditEvent = () => {
                     control={control}
                     defaultValue=""
                     render={({ field }) => (
-                      <ReactQuill
-                        theme="snow"
-                        value={field.value}
-                        onChange={field.onChange}
-                        modules={quillModules}
-                        formats={quillFormats}
-                        placeholder="Descreva seu evento de forma detalhada..."
-                        className="bg-white"
-                      />
+                      <div className="min-h-[400px]">
+                        <ReactQuill
+                          theme="snow"
+                          value={field.value}
+                          onChange={field.onChange}
+                          modules={quillModules}
+                          formats={quillFormats}
+                          placeholder="Descreva seu evento de forma detalhada..."
+                          className="bg-white"
+                          style={{ height: '350px' }}
+                        />
+                      </div>
                     )}
                   />
                   {errors.description && (
                     <p className="form-error">{errors.description.message}</p>
                   )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="date" className="form-label">
-                      Data e Hora *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        id="date"
-                        type="datetime-local"
-                        className="input pl-10"
-                        {...register('date', {
-                          required: 'Data e hora são obrigatórias',
-                        })}
-                      />
-                    </div>
-                    {errors.date && (
-                      <p className="form-error">{errors.date.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="location" className="form-label">
-                      Local *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MapPin className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        id="location"
-                        type="text"
-                        className="input pl-10"
-                        placeholder="Ex: Centro de Convenções"
-                        {...register('location', {
-                          required: 'Local é obrigatório',
-                        })}
-                      />
-                    </div>
-                    {errors.location && (
-                      <p className="form-error">{errors.location.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="capacity" className="form-label">
-                      Capacidade
-                    </label>
-                    <input
-                      id="capacity"
-                      type="number"
-                      min="1"
-                      className="input"
-                      placeholder="Ex: 100"
-                      {...register('capacity', {
-                        min: {
-                          value: 1,
-                          message: 'Capacidade deve ser maior que 0',
-                        },
-                      })}
-                    />
-                    {errors.capacity && (
-                      <p className="form-error">{errors.capacity.message}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Configurações Avançadas */}
-            <div className="card">
-              <div className="card-header">
-                <h3 className="text-lg font-medium text-gray-900">Configurações</h3>
-              </div>
-              <div className="card-body space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="isActive" className="form-label">
-                      Evento Ativo
-                    </label>
-                    <p className="text-sm text-gray-500">
-                      Eventos inativos não aparecem para convidados
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      {...register('isActive')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="isPublic" className="form-label">
-                      Evento Público
-                    </label>
-                    <p className="text-sm text-gray-500">
-                      Eventos públicos podem ser acessados por qualquer pessoa
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      {...register('isPublic')}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
                 </div>
               </div>
             </div>
@@ -397,6 +283,127 @@ const EditEvent = () => {
                     className="input"
                     {...register('image')}
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Detalhes do Evento */}
+            <div className="card">
+              <div className="card-header">
+                <h3 className="text-lg font-medium text-gray-900">Detalhes do Evento</h3>
+              </div>
+              <div className="card-body space-y-4">
+                <div>
+                  <label htmlFor="date" className="form-label">
+                    Data e Hora *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Calendar className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="date"
+                      type="datetime-local"
+                      className="input pl-10"
+                      {...register('date', {
+                        required: 'Data e hora são obrigatórias',
+                      })}
+                    />
+                  </div>
+                  {errors.date && (
+                    <p className="form-error">{errors.date.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="location" className="form-label">
+                    Local *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <MapPin className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="location"
+                      type="text"
+                      className="input pl-10"
+                      placeholder="Ex: Centro de Convenções"
+                      {...register('location', {
+                        required: 'Local é obrigatório',
+                      })}
+                    />
+                  </div>
+                  {errors.location && (
+                    <p className="form-error">{errors.location.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="capacity" className="form-label">
+                    Capacidade
+                  </label>
+                  <input
+                    id="capacity"
+                    type="number"
+                    min="1"
+                    className="input"
+                    placeholder="Ex: 100"
+                    {...register('capacity', {
+                      min: {
+                        value: 1,
+                        message: 'Capacidade deve ser maior que 0',
+                      },
+                    })}
+                  />
+                  {errors.capacity && (
+                    <p className="form-error">{errors.capacity.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Configurações */}
+            <div className="card">
+              <div className="card-header">
+                <h3 className="text-lg font-medium text-gray-900">Configurações</h3>
+              </div>
+              <div className="card-body space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="isActive" className="form-label">
+                      Evento Ativo
+                    </label>
+                    <p className="text-sm text-gray-500">
+                      Eventos inativos não aparecem para convidados
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      {...register('isActive')}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="isPublic" className="form-label">
+                      Evento Público
+                    </label>
+                    <p className="text-sm text-gray-500">
+                      Eventos públicos podem ser acessados por qualquer pessoa
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      {...register('isPublic')}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  </label>
                 </div>
               </div>
             </div>
