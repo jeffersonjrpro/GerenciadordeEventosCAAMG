@@ -6,64 +6,99 @@ services:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DATABASE_NAME:-gerenciador_eventos}
-      POSTGRES_USER: ${DATABASE_USER:-postgres}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres123}
+      POSTGRES_DB: gerenciador_eventos
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   # Backend Node.js
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
+    image: node:18-alpine
     restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache git curl &&
+        git clone https://github.com/jeffersonjrpro/GerenciadordeEventosCAAMG.git /tmp/repo &&
+        cp -r /tmp/repo/backend/* /app/ &&
+        npm ci --only=production &&
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        npm start
+      "
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres123}@postgres:5432/${DATABASE_NAME:-gerenciador_eventos}
-      JWT_SECRET: ${JWT_SECRET:-sua_chave_jwt_super_secreta_aqui}
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-seu_email@gmail.com}
-      SMTP_PASS: ${SMTP_PASS:-sua_senha_app}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/gerenciador_eventos
+      JWT_SECRET: sua_chave_jwt_super_secreta_aqui
+      SMTP_HOST: smtp.task.com.br
+      SMTP_PORT: 587
+      SMTP_USER: jefferson.martins@caamg.com.br
+      SMTP_PASS: 6rTxv.1@
+      FRONTEND_URL: https://eventos.caamg.com.br
     volumes:
       - uploads:/app/uploads
       - temp:/app/temp
     networks:
       - app-network
+      - traefik_default
     depends_on:
       postgres:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eventos-backend.rule=Host(`eventos.caamg.com.br`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.eventos-backend.entrypoints=websecure"
+      - "traefik.http.routers.eventos-backend.tls=true"
+      - "traefik.http.services.eventos-backend.loadbalancer.server.port=3001"
+      - "traefik.docker.network=traefik_default"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/public/planos"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   # Frontend React
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
+    image: node:18-alpine
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache git &&
+        git clone https://github.com/jeffersonjrpro/GerenciadordeEventosCAAMG.git /tmp/repo &&
+        cp -r /tmp/repo/frontend/* /app/ &&
+        npm ci &&
+        npm run build &&
+        npx serve -s build -l 3000
+      "
+    environment:
+      REACT_APP_API_URL: https://eventos.caamg.com.br
     networks:
       - app-network
+      - traefik_default
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eventos-frontend.rule=Host(`eventos.caamg.com.br`)"
+      - "traefik.http.routers.eventos-frontend.entrypoints=websecure"
+      - "traefik.http.routers.eventos-frontend.tls=true"
+      - "traefik.http.services.eventos-frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik_default"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Nginx Reverse Proxy
   nginx:
@@ -93,4 +128,6 @@ volumes:
 
 networks:
   app-network:
-    driver: bridge 
+    driver: bridge
+  traefik_default:
+    external: true 
