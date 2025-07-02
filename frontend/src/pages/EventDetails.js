@@ -598,6 +598,18 @@ const EventDetails = () => {
                 Ver Página Pública
               </button>
               
+              {event?.customSlug && (
+                <button
+                  onClick={() => window.open(`${window.location.origin}/e/${event.customSlug}`, '_blank')}
+                  className="btn-outline w-full inline-flex items-center justify-center"
+                  disabled={!event?.isPublic}
+                  title={!event?.isPublic ? 'Evento deve estar público para visualizar' : 'Abrir página pública personalizada'}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver URL Personalizada
+                </button>
+              )}
+              
               <button
                 onClick={() => window.open(`${window.location.origin}/event/${eventId}/formulario`, '_blank')}
                 className="btn-outline w-full inline-flex items-center justify-center"
@@ -607,6 +619,18 @@ const EventDetails = () => {
                 <Type className="h-4 w-4 mr-2" />
                 Ver Formulário
               </button>
+              
+              {event?.customSlug && (
+                <button
+                  onClick={() => window.open(`${window.location.origin}/e/${event.customSlug}/formulario`, '_blank')}
+                  className="btn-outline w-full inline-flex items-center justify-center"
+                  disabled={!event?.isPublic || !event?.isActive}
+                  title={!event?.isPublic ? 'Evento deve estar público para visualizar' : !event?.isActive ? 'Evento deve estar ativo para visualizar' : 'Abrir formulário de inscrição personalizado'}
+                >
+                  <Type className="h-4 w-4 mr-2" />
+                  Ver Formulário Personalizado
+                </button>
+              )}
             </div>
           </div>
 

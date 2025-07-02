@@ -98,6 +98,59 @@ const FormSettings = ({ settings, onUpdate, eventId }) => {
             </div>
           </div>
 
+          {/* Ação Pós-Inscrição */}
+          <div>
+            <label className="form-label">O que acontece após a inscrição?</label>
+            <select
+              value={settings.postSubmitAction || 'qr'}
+              onChange={e => handleChange('postSubmitAction', e.target.value)}
+              className="input"
+            >
+              <option value="qr">Mostrar QR Code e mensagem padrão</option>
+              <option value="message">Exibir frase personalizada</option>
+              <option value="redirect">Redirecionar para link personalizado</option>
+              <option value="customText">Exibir texto personalizado na tela</option>
+            </select>
+          </div>
+
+          {/* Campos dinâmicos conforme ação */}
+          {settings.postSubmitAction === 'message' && (
+            <div>
+              <label className="form-label">Frase personalizada</label>
+              <input
+                type="text"
+                value={settings.customMessage || ''}
+                onChange={e => handleChange('customMessage', e.target.value)}
+                className="input"
+                placeholder="Ex: Obrigado por se inscrever!"
+              />
+            </div>
+          )}
+          {settings.postSubmitAction === 'redirect' && (
+            <div>
+              <label className="form-label">Link de redirecionamento</label>
+              <input
+                type="url"
+                value={settings.redirectUrl || ''}
+                onChange={e => handleChange('redirectUrl', e.target.value)}
+                className="input"
+                placeholder="https://seusite.com/obrigado"
+              />
+            </div>
+          )}
+          {settings.postSubmitAction === 'customText' && (
+            <div>
+              <label className="form-label">Texto personalizado</label>
+              <textarea
+                value={settings.customText || ''}
+                onChange={e => handleChange('customText', e.target.value)}
+                rows={3}
+                className="input"
+                placeholder="Digite o texto que será exibido após a inscrição"
+              />
+            </div>
+          )}
+
           {/* Código de Incorporação */}
           <div className="border-t pt-6">
             <h4 className="text-md font-medium text-gray-900 mb-4">Código de Incorporação</h4>

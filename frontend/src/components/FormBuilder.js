@@ -104,9 +104,20 @@ const FormBuilder = ({ eventId, onSave }) => {
   const updateField = (fieldId, updates) => {
     setConfig(prev => ({
       ...prev,
-      fields: prev.fields.map(field =>
-        field.id === fieldId ? { ...field, ...updates } : field
-      )
+      fields: prev.fields.map(field => {
+        if (field.id === fieldId) {
+          if (updates.type && updates.type !== field.type) {
+            return {
+              ...field,
+              ...updates,
+              placeholder: getDefaultPlaceholder(updates.type),
+              label: getDefaultLabel(updates.type)
+            };
+          }
+          return { ...field, ...updates };
+        }
+        return field;
+      })
     }));
   };
 

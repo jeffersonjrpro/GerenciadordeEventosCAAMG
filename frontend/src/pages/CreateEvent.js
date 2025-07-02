@@ -35,6 +35,11 @@ const CreateEvent = () => {
             if (!isNaN(numValue) && numValue > 0) {
               formData.append(key, numValue.toString());
             }
+          } else if (key === 'customSlug') {
+            // Adiciona customSlug se não estiver vazio
+            if (data[key].trim()) {
+              formData.append('customSlug', data[key].trim());
+            }
           } else if (key !== 'image') { // Não adiciona o campo image aqui
             formData.append(key, data[key]);
           }
@@ -135,6 +140,41 @@ const CreateEvent = () => {
                   />
                   {errors.name && (
                     <p className="form-error">{errors.name.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="customSlug" className="form-label">
+                    URL Personalizada
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">seu-dominio.com/event/</span>
+                    <input
+                      id="customSlug"
+                      type="text"
+                      className="input flex-1"
+                      placeholder="conferencia-tecnologia-2024"
+                      {...register('customSlug', {
+                        pattern: {
+                          value: /^[a-z0-9-]+$/,
+                          message: 'Apenas letras minúsculas, números e hífens são permitidos'
+                        },
+                        minLength: {
+                          value: 3,
+                          message: 'URL deve ter pelo menos 3 caracteres',
+                        },
+                        maxLength: {
+                          value: 50,
+                          message: 'URL deve ter no máximo 50 caracteres',
+                        },
+                      })}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Deixe em branco para gerar automaticamente baseado no nome do evento
+                  </p>
+                  {errors.customSlug && (
+                    <p className="form-error">{errors.customSlug.message}</p>
                   )}
                 </div>
 

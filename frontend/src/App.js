@@ -77,6 +77,12 @@ function App() {
               <Route path="/event/:eventId/formulario" element={<PublicEvent />} />
               <Route path="/preview/event/:eventId" element={<PublicEvent />} />
               
+              {/* Rotas públicas por slug personalizado */}
+              <Route path="/e/:slug" element={<PublicEvent />} />
+              <Route path="/e/:slug/register" element={<PublicEvent />} />
+              <Route path="/e/:slug/formulario" element={<PublicEvent />} />
+              <Route path="/preview/e/:slug" element={<PublicEvent />} />
+              
               {/* Rota de convite (pública mas pode requerer login) */}
               <Route path="/convite/:token" element={<InviteAccept />} />
               

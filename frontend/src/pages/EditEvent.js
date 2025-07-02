@@ -13,6 +13,7 @@ const EditEvent = () => {
   const [saving, setSaving] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [event, setEvent] = useState(null);
+  const [quillError, setQuillError] = useState(false);
 
   const {
     register,
@@ -46,6 +47,7 @@ const EditEvent = () => {
         date: formattedDate,
         location: eventData.location,
         capacity: eventData.maxGuests || '',
+        customSlug: eventData.customSlug || '',
         isActive: eventData.isActive,
         isPublic: eventData.isPublic
       });
@@ -77,6 +79,11 @@ const EditEvent = () => {
           } else if (key === 'description') {
             // Evita que descrições vazias (<p><br></p>) sejam salvas como nulas
             formData.append('description', data[key] === '<p><br></p>' ? '' : data[key]);
+          } else if (key === 'customSlug') {
+            // Adiciona customSlug se não estiver vazio
+            if (data[key].trim()) {
+              formData.append('customSlug', data[key].trim());
+            }
           } else if (key !== 'image') { // Não adiciona o campo image aqui
             formData.append(key, data[key]);
           }
@@ -116,6 +123,9 @@ const EditEvent = () => {
         setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
+    } else {
+      // Se não há arquivo selecionado, mostrar a imagem atual do evento
+      setImagePreview(event?.imageUrl || null);
     }
   };
 
@@ -217,6 +227,41 @@ const EditEvent = () => {
                 </div>
 
                 <div>
+                  <label htmlFor="customSlug" className="form-label">
+                    URL Personalizada
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">seu-dominio.com/event/</span>
+                    <input
+                      id="customSlug"
+                      type="text"
+                      className="input flex-1"
+                      placeholder="conferencia-tecnologia-2024"
+                      {...register('customSlug', {
+                        pattern: {
+                          value: /^[a-z0-9-]+$/,
+                          message: 'Apenas letras minúsculas, números e hífens são permitidos'
+                        },
+                        minLength: {
+                          value: 3,
+                          message: 'URL deve ter pelo menos 3 caracteres',
+                        },
+                        maxLength: {
+                          value: 50,
+                          message: 'URL deve ter no máximo 50 caracteres',
+                        },
+                      })}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Deixe em branco para gerar automaticamente baseado no nome do evento
+                  </p>
+                  {errors.customSlug && (
+                    <p className="form-error">{errors.customSlug.message}</p>
+                  )}
+                </div>
+
+                <div>
                   <label htmlFor="description" className="form-label">
                     Descrição
                   </label>
@@ -226,16 +271,31 @@ const EditEvent = () => {
                     defaultValue=""
                     render={({ field }) => (
                       <div className="min-h-[400px]">
-                        <ReactQuill
-                          theme="snow"
-                          value={field.value}
-                          onChange={field.onChange}
-                          modules={quillModules}
-                          formats={quillFormats}
-                          placeholder="Descreva seu evento de forma detalhada..."
-                          className="bg-white"
-                          style={{ height: '350px' }}
-                        />
+                        {!quillError ? (
+                          <div className="react-quill-wrapper">
+                            <ReactQuill
+                              theme="snow"
+                              value={field.value}
+                              onChange={field.onChange}
+                              modules={quillModules}
+                              formats={quillFormats}
+                              placeholder="Descreva seu evento de forma detalhada..."
+                              className="bg-white"
+                              style={{ height: '350px' }}
+                              onError={(error) => {
+                                console.error('ReactQuill error:', error);
+                                setQuillError(true);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <textarea
+                            {...field}
+                            rows={15}
+                            className="input w-full"
+                            placeholder="Descreva seu evento de forma detalhada..."
+                          />
+                        )}
                       </div>
                     )}
                   />

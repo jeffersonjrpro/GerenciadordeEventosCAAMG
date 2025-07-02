@@ -144,6 +144,39 @@ const FormPreview = ({ config, eventId }) => {
   };
 
   if (submitted) {
+    // Pós-inscrição customizada
+    const action = config.settings.postSubmitAction || 'qr';
+    if (action === 'message') {
+      return (
+        <div className="max-w-md mx-auto">
+          <div className="card text-center">
+            <div className="card-body">
+              <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {config.settings.customMessage || 'Inscrição realizada com sucesso!'}
+              </h3>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (action === 'redirect') {
+      window.location.href = config.settings.redirectUrl || '/';
+      return null;
+    }
+    if (action === 'customText') {
+      return (
+        <div className="max-w-md mx-auto">
+          <div className="card text-center">
+            <div className="card-body">
+              <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+              <div className="text-gray-900 text-lg mb-2" dangerouslySetInnerHTML={{__html: config.settings.customText || 'Inscrição realizada!'}} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // Padrão: QR code e mensagem
     return (
       <div className="max-w-md mx-auto">
         <div className="card text-center">

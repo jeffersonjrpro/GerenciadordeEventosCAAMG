@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { 
   Save, 
   Eye, 
@@ -16,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import api from '../services/api';
 
 const PublicPageEditor = ({ eventId, onSave }) => {
   const [config, setConfig] = useState({
@@ -65,41 +68,52 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   const [isDescriptionSaving, setIsDescriptionSaving] = useState(false);
   const descriptionSaveTimeout = useRef(null);
 
+  const [quillError, setQuillError] = useState(false);
+
+  // ReactQuill configuration
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+      ['link', 'image'],
+      ['clean']
+    ],
+  };
+
+  const quillFormats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'link', 'image'
+  ];
+
   useEffect(() => {
     loadPageConfig();
   }, [eventId]);
 
   const loadPageConfig = async () => {
     try {
-      const response = await fetch(`/api/events/${eventId}/public-page-config`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await api.get(`/events/${eventId}/public-page-config`);
       
-      if (response.ok) {
-        const data = await response.json();
-        setConfig(data.data);
+      if (response.data) {
+        setConfig(response.data.data);
         
         // Also load event data for reference
-        const eventResponse = await fetch(`/api/events/${eventId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        const eventResponse = await api.get(`/events/${eventId}`);
         
-        if (eventResponse.ok) {
-          const eventData = await eventResponse.json();
-          setEventData(eventData.data);
-          setDescription(eventData.data.description || '');
+        if (eventResponse.data) {
+          const eventData = eventResponse.data.data;
+          setEventData(eventData);
+          setDescription(eventData.description || '');
           
           // Sincronizar a imagem do evento com a configuração da página
-          if (eventData.data.imageUrl && !data.data.header.imageUrl) {
+          if (eventData.imageUrl && !response.data.data.header.imageUrl) {
             setConfig(prev => ({
               ...prev,
               header: {
                 ...prev.header,
-                imageUrl: eventData.data.imageUrl
+                imageUrl: eventData.imageUrl
               }
             }));
           }
@@ -116,27 +130,20 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   const saveDescription = useCallback(async (newDescription) => {
     setIsDescriptionSaving(true);
     try {
-      const response = await fetch(`/api/events/${eventId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ description: newDescription })
+      const response = await api.put(`/events/${eventId}`, {
+        description: newDescription
       });
 
-      if (!response.ok) {
-        throw new Error('Falha ao salvar a descrição');
+      if (response.data) {
+        // Optionally update local event data
+        setEventData(prev => ({
+          ...prev,
+          data: {
+            ...prev.data,
+            description: newDescription
+          }
+        }));
       }
-
-      // Optionally update local event data
-      setEventData(prev => ({
-        ...prev,
-        data: {
-          ...prev.data,
-          description: newDescription
-        }
-      }));
 
     } catch (error) {
       console.error('Erro ao salvar descrição:', error);
@@ -175,23 +182,19 @@ const PublicPageEditor = ({ eventId, onSave }) => {
     formData.append('image', file);
 
     try {
-      const response = await fetch(`/api/events/${eventId}/image`, {
-        method: 'POST',
+      const response = await api.post(`/events/${eventId}/image`, formData, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'multipart/form-data',
         },
-        body: formData
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
+      if (response.data) {
         // Atualizar a configuração da página com a nova URL da imagem
         const updatedConfig = {
           ...config,
           header: {
             ...config.header,
-            imageUrl: data.data.imageUrl
+            imageUrl: response.data.data.imageUrl
           }
         };
         
@@ -202,7 +205,7 @@ const PublicPageEditor = ({ eventId, onSave }) => {
           ...prev,
           data: {
             ...prev.data,
-            imageUrl: data.data.imageUrl
+            imageUrl: response.data.data.imageUrl
           }
         }));
 
@@ -210,9 +213,6 @@ const PublicPageEditor = ({ eventId, onSave }) => {
         await savePageConfig(updatedConfig);
 
         alert('Imagem atualizada com sucesso!');
-      } else {
-        const error = await response.json();
-        alert(`Erro ao fazer upload: ${error.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro ao fazer upload da imagem:', error);
@@ -223,46 +223,35 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   };
 
   const handleRemoveImage = async () => {
-    setIsConfirmModalOpen(false);
     setRemovingImage(true);
-
     try {
-      const response = await fetch(`/api/events/${eventId}/image`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      await api.delete(`/events/${eventId}/image`);
+      
+      // Atualizar a configuração da página removendo a imagem
+      const updatedConfig = {
+        ...config,
+        header: {
+          ...config.header,
+          imageUrl: ''
         }
-      });
+      };
+      
+      setConfig(updatedConfig);
 
-      if (response.ok) {
-        // Remover a imagem da configuração da página
-        const updatedConfig = {
-          ...config,
-          header: {
-            ...config.header,
-            imageUrl: null
-          }
-        };
-        
-        setConfig(updatedConfig);
+      // Atualizar os dados do evento
+      setEventData(prev => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          imageUrl: null
+        }
+      }));
 
-        // Atualizar os dados do evento
-        setEventData(prev => ({
-          ...prev,
-          data: {
-            ...prev.data,
-            imageUrl: null
-          }
-        }));
+      // Salvar automaticamente a configuração da página
+      await savePageConfig(updatedConfig);
 
-        // Salvar automaticamente a configuração da página
-        await savePageConfig(updatedConfig);
-
-        alert('Imagem removida com sucesso!');
-      } else {
-        const error = await response.json();
-        alert(`Erro ao remover imagem: ${error.message || 'Erro desconhecido'}`);
-      }
+      setIsConfirmModalOpen(false);
+      alert('Imagem removida com sucesso!');
     } catch (error) {
       console.error('Erro ao remover imagem:', error);
       alert('Erro ao remover imagem');
@@ -274,20 +263,11 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   const savePageConfig = async (configToSave) => {
     setAutoSaving(true);
     try {
-      const response = await fetch(`/api/events/${eventId}/public-page-config`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(configToSave)
-      });
+      const response = await api.put(`/events/${eventId}/public-page-config`, configToSave);
 
-      if (response.ok) {
+      if (response.data) {
         if (onSave) onSave(configToSave);
         console.log('Configuração da página salva automaticamente');
-      } else {
-        console.error('Erro ao salvar configuração da página automaticamente');
       }
     } catch (error) {
       console.error('Erro ao salvar configuração da página:', error);
@@ -307,21 +287,17 @@ const PublicPageEditor = ({ eventId, onSave }) => {
     }
     
     // Se é um caminho relativo, construir a URL completa
-    return `${window.location.origin}${imageUrl}`;
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    // Garantir que o caminho comece com /uploads/
+    const normalizedPath = imageUrl.startsWith('/uploads/') ? imageUrl : `/uploads/${imageUrl}`;
+    return `${baseUrl}${normalizedPath}`;
   };
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`/api/events/${eventId}/public-page-config`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(config)
-      });
+      const response = await api.put(`/events/${eventId}/public-page-config`, config);
 
-      if (response.ok) {
+      if (response.data) {
         if (onSave) onSave(config);
         alert('Página salva com sucesso!');
       }
@@ -457,7 +433,7 @@ const PublicPageEditor = ({ eventId, onSave }) => {
                 </div>
 
                 {/* Image Management Section */}
-                <div className="border-t pt-4">
+                <div>
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <label className="form-label">Imagem do Evento</label>
@@ -482,6 +458,10 @@ const PublicPageEditor = ({ eventId, onSave }) => {
                           src={getImageUrl()}
                           alt="Imagem do evento"
                           className="w-32 h-32 object-cover rounded-lg border"
+                          onError={(e) => {
+                            console.error('❌ Erro ao carregar imagem:', e.target.src);
+                            e.target.style.display = 'none';
+                          }}
                         />
                         <button
                           onClick={() => setIsConfirmModalOpen(true)}
@@ -618,15 +598,36 @@ const PublicPageEditor = ({ eventId, onSave }) => {
                        </span>
                     )}
                   </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => handleDescriptionChange(e.target.value)}
-                    rows={6}
-                    className="input"
-                    placeholder="Descreva seu evento de forma detalhada..."
-                  />
+                  <div className="min-h-[400px]">
+                    {!quillError ? (
+                      <div className="react-quill-wrapper">
+                        <ReactQuill
+                          theme="snow"
+                          value={description}
+                          onChange={handleDescriptionChange}
+                          modules={quillModules}
+                          formats={quillFormats}
+                          placeholder="Descreva seu evento de forma detalhada..."
+                          className="bg-white"
+                          style={{ height: '350px' }}
+                          onError={(error) => {
+                            console.error('ReactQuill error:', error);
+                            setQuillError(true);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <textarea
+                        value={description}
+                        onChange={(e) => handleDescriptionChange(e.target.value)}
+                        rows={15}
+                        className="input w-full"
+                        placeholder="Descreva seu evento de forma detalhada..."
+                      />
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 mt-1">
-                    Para formatação avançada, edite o evento na página de eventos.
+                    Use o editor acima para formatar o texto com títulos, listas, links e imagens.
                   </p>
                 </div>
 

@@ -77,19 +77,26 @@ export default function Demandas({ sidebarCollapsed }) {
     }
     setErroSetor('');
     try {
+      // Filtrar observações que têm texto
+      const observacoesValidas = observacoes
+        .filter(obs => obs.texto && obs.texto.trim())
+        .map(obs => ({ texto: obs.texto.trim(), autorId: user.id }));
+
+      const dadosParaEnviar = {
+        ...novaDemanda,
+        descricao,
+        observacoesIniciais: observacoesValidas,
+      };
+
+      console.log('Dados sendo enviados:', dadosParaEnviar);
+
       if (editandoDemandaId) {
-        await api.put(`/demandas/${editandoDemandaId}`, {
-          ...novaDemanda,
-          descricao,
-          observacoesIniciais: observacoes.map(obs => ({ texto: obs.texto, autorId: user.id })),
-        });
+        const response = await api.put(`/demandas/${editandoDemandaId}`, dadosParaEnviar);
+        console.log('Resposta da edição:', response.data);
         toast.success('Demanda atualizada!');
       } else {
-        await api.post('/demandas', {
-          ...novaDemanda,
-          descricao,
-          observacoesIniciais: observacoes.map(obs => ({ texto: obs.texto, autorId: user.id })),
-        });
+        const response = await api.post('/demandas', dadosParaEnviar);
+        console.log('Resposta da criação:', response.data);
         toast.success('Demanda criada!');
       }
       setShowModal(false);
@@ -98,7 +105,9 @@ export default function Demandas({ sidebarCollapsed }) {
       setObservacoes([]);
       setEditandoDemandaId(null);
       carregarDemandas();
-    } catch {
+    } catch (error) {
+      console.error('Erro detalhado:', error);
+      console.error('Resposta do servidor:', error.response?.data);
       toast.error(editandoDemandaId ? 'Erro ao atualizar demanda' : 'Erro ao criar demanda');
     }
   };
@@ -434,7 +443,7 @@ export default function Demandas({ sidebarCollapsed }) {
                 <div className="bg-gray-50 p-4 rounded-lg border space-y-3">
                   {detalhe.observacoes.map((obs, idx) => (
                     <div key={idx} className="bg-white p-3 rounded border-l-4 border-blue-500">
-                      <div className="text-xs text-gray-500 mb-1">{new Date(obs.data).toLocaleString('pt-BR')} - {obs.autor?.name || obs.autor?.nome || 'Usuário'}</div>
+                      <div className="text-xs text-gray-500 mb-1">{new Date(obs.data).toLocaleString('pt-BR')} - {obs.autor?.name || 'Usuário'}</div>
                       <p className="text-gray-800">{obs.texto}</p>
                     </div>
                   ))}

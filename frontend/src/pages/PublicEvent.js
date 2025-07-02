@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const PublicEvent = () => {
-  const { eventId } = useParams();
+  const { eventId, slug } = useParams();
   const location = useLocation();
   const [event, setEvent] = useState(null);
   const [formConfig, setFormConfig] = useState(null);
@@ -33,7 +33,11 @@ const PublicEvent = () => {
 
   // Verifica se está na rota do formulário
   const isFormOnly = location.pathname.includes('/formulario');
-  const isPreview = location.pathname.includes('/preview/event/');
+  const isPreview = location.pathname.includes('/preview/');
+  
+  // Determina se está usando slug ou ID
+  const isUsingSlug = !!slug;
+  const eventIdentifier = isUsingSlug ? slug : eventId;
 
   const {
     register,
@@ -44,136 +48,61 @@ const PublicEvent = () => {
 
   useEffect(() => {
     fetchEventDetails();
-  }, [eventId]);
+  }, [eventIdentifier, isUsingSlug]);
 
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
       setError(null);
-      setEventNotAvailable(false);
+      console.log('🔍 fetchEventDetails - Iniciando carregamento do evento');
       
       // Se for preview, usa a API de preview sem restrições
       const eventEndpoint = isPreview 
-        ? `/public/events/${eventId}/preview`
-        : `/public/events/${eventId}`;
+        ? (isUsingSlug ? `/public/events/slug/${eventIdentifier}/preview` : `/public/events/${eventIdentifier}/preview`)
+        : (isUsingSlug ? `/public/events/slug/${eventIdentifier}` : `/public/events/${eventIdentifier}`);
       
       console.log('🔍 fetchEventDetails - eventEndpoint:', eventEndpoint);
       console.log('🔍 fetchEventDetails - isPreview:', isPreview);
-      console.log('🔍 fetchEventDetails - eventId:', eventId);
+      console.log('🔍 fetchEventDetails - isUsingSlug:', isUsingSlug);
+      console.log('🔍 fetchEventDetails - eventIdentifier:', eventIdentifier);
       
       // Primeiro tenta carregar o evento
       const eventResponse = await api.get(eventEndpoint);
       console.log('✅ fetchEventDetails - evento carregado:', eventResponse.data);
-      console.log('✅ fetchEventDetails - evento isActive:', eventResponse.data.data?.isActive);
-      console.log('✅ fetchEventDetails - evento isPublic:', eventResponse.data.data?.isPublic);
-      
       setEvent(eventResponse.data.data);
-      
-      // Verificação adicional: se não for preview, verificar se o evento está ativo e público
-      if (!isPreview && (!eventResponse.data.data.isActive || !eventResponse.data.data.isPublic)) {
-        console.log('⚠️ fetchEventDetails - evento não está ativo ou público');
-        setEventNotAvailable(true);
-        setError('Evento não está disponível publicamente');
-        return;
-      }
-      
-      // Depois tenta carregar a configuração do formulário
-      try {
-        const formEndpoint = isPreview 
-          ? `/public/events/${eventId}/form-config/preview`
-          : `/public/events/${eventId}/form-config`;
-        
-        const formResponse = await api.get(formEndpoint);
-        console.log('✅ fetchEventDetails - form config carregado:', formResponse.data);
-        setFormConfig(formResponse.data.data);
-      } catch (formError) {
-        console.warn('⚠️ fetchEventDetails - erro ao carregar form config:', formError);
-        // Se não conseguir carregar a configuração do formulário, usa uma padrão
-        setFormConfig({
-          fields: [
-            {
-              id: 'name',
-              type: 'text',
-              label: 'Nome Completo',
-              required: true,
-              placeholder: 'Digite seu nome completo',
-              order: 1
-            },
-            {
-              id: 'email',
-              type: 'email',
-              label: 'E-mail',
-              required: true,
-              placeholder: 'Digite seu e-mail',
-              order: 2
-            },
-            {
-              id: 'phone',
-              type: 'tel',
-              label: 'Telefone',
-              required: false,
-              placeholder: 'Digite seu telefone',
-              order: 3
-            }
-          ],
-          settings: {
-            title: 'Inscrição no Evento',
-            description: 'Preencha os dados abaixo para se inscrever',
-            submitButtonText: 'Confirmar Inscrição',
-            successMessage: 'Inscrição realizada com sucesso!',
-            showProgressBar: true,
-            allowMultipleSubmissions: false
-          }
-        });
+
+      // Se não for apenas formulário, carrega as configurações
+      if (!isFormOnly) {
+        // Carregar configuração do formulário
+        try {
+          const formEndpoint = isPreview 
+            ? (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config/preview`)
+            : (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config`);
+          
+          const formResponse = await api.get(formEndpoint);
+          console.log('✅ fetchEventDetails - formConfig carregado:', formResponse.data);
+          setFormConfig(formResponse.data.data);
+        } catch (formError) {
+          console.warn('⚠️ fetchEventDetails - Erro ao carregar formConfig:', formError);
+          // Não é crítico, pode continuar sem configuração do formulário
+        }
+
+        // Carregar configuração da página
+        try {
+          const pageConfigEndpoint = isPreview 
+            ? (isUsingSlug ? `/public/events/slug/${eventIdentifier}/page-config` : `/public/events/${eventIdentifier}/public-page-config/preview`)
+            : (isUsingSlug ? `/public/events/slug/${eventIdentifier}/page-config` : `/events/${eventIdentifier}/public-page-config`);
+          
+          const pageConfigResponse = await api.get(pageConfigEndpoint);
+          console.log('✅ fetchEventDetails - pageConfig carregado:', pageConfigResponse.data);
+          setPageConfig(pageConfigResponse.data.data);
+        } catch (pageConfigError) {
+          console.warn('⚠️ fetchEventDetails - Erro ao carregar pageConfig:', pageConfigError);
+          // Não é crítico, pode continuar sem configuração da página
+        }
       }
 
-      // Carregar configuração da página pública
-      try {
-        const pageConfigEndpoint = isPreview 
-          ? `/public/events/${eventId}/public-page-config/preview`
-          : `/events/${eventId}/public-page-config`;
-        
-        const pageConfigResponse = await api.get(pageConfigEndpoint);
-        console.log('✅ fetchEventDetails - page config carregado:', pageConfigResponse.data);
-        console.log('🔍 fetchEventDetails - showImage:', pageConfigResponse.data.data?.header?.showImage);
-        console.log('🔍 fetchEventDetails - imageUrl:', eventResponse.data.data.imageUrl);
-        setPageConfig(pageConfigResponse.data.data);
-      } catch (pageConfigError) {
-        console.warn('⚠️ fetchEventDetails - erro ao carregar page config:', pageConfigError);
-        // Se não conseguir carregar a configuração da página, usa uma padrão
-        setPageConfig({
-          layout: 'modern',
-          theme: {
-            primaryColor: '#3B82F6',
-            secondaryColor: '#1E40AF',
-            backgroundColor: '#FFFFFF',
-            textColor: '#1F2937'
-          },
-          header: {
-            title: eventResponse.data.data.name,
-            subtitle: eventResponse.data.data.description || 'Um evento incrível está chegando!',
-            showImage: true,
-            imageUrl: eventResponse.data.data.imageUrl
-          },
-          content: {
-            showDate: true,
-            showLocation: true,
-            showDescription: true,
-            showOrganizer: true,
-            customText: ''
-          },
-          registration: {
-            showForm: true,
-            buttonText: 'Inscrever-se',
-            formTitle: 'Faça sua inscrição',
-            formDescription: 'Preencha os dados abaixo para participar do evento'
-          },
-          footer: {
-            showSocialLinks: false,
-            customText: '© 2024 Sistema de Eventos'
-          }
-        });
-      }
+      console.log('✅ fetchEventDetails - Carregamento concluído com sucesso');
     } catch (error) {
       console.error('❌ fetchEventDetails - erro ao carregar evento:', error);
       console.error('❌ fetchEventDetails - error.response:', error.response);
@@ -199,7 +128,12 @@ const PublicEvent = () => {
       setSubmitting(true);
       setError(null);
       
-      const response = await api.post(`/public/events/${eventId}/guests/public`, data);
+      const response = await api.post(
+        isUsingSlug 
+          ? `/public/events/slug/${eventIdentifier}/guests/public`
+          : `/public/events/${eventIdentifier}/guests/public`, 
+        data
+      );
       setGuest(response.data.data);
       setRegistrationSuccess(true);
       reset();
@@ -227,7 +161,8 @@ const PublicEvent = () => {
     if (imageUrl.startsWith('http')) return imageUrl;
     // Garantir que o caminho comece com /uploads/
     const normalizedPath = imageUrl.startsWith('/uploads/') ? imageUrl : `/uploads/${imageUrl}`;
-    return `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${normalizedPath}`;
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    return `${baseUrl}${normalizedPath}`;
   };
 
   const getEventStatus = (event) => {
@@ -335,6 +270,38 @@ const PublicEvent = () => {
   // Landing page principal do evento
   // A página de sucesso é renderizada primeiro se a inscrição foi bem-sucedida
   if (registrationSuccess && guest) {
+    const action = formConfig?.settings?.postSubmitAction || 'qr';
+    if (action === 'message') {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+          <div className="max-w-2xl mx-auto px-4 py-12">
+            <div className="text-center">
+              <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-6" />
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                {formConfig?.settings?.customMessage || 'Inscrição realizada com sucesso!'}
+              </h1>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (action === 'redirect') {
+      window.location.href = formConfig?.settings?.redirectUrl || '/';
+      return null;
+    }
+    if (action === 'customText') {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+          <div className="max-w-2xl mx-auto px-4 py-12">
+            <div className="text-center">
+              <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-6" />
+              <div className="text-gray-900 text-lg mb-2" dangerouslySetInnerHTML={{__html: formConfig?.settings?.customText || 'Inscrição realizada!'}} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // Padrão: QR code e mensagem
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
         <div className="max-w-2xl mx-auto px-4 py-12">
