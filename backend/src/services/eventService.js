@@ -981,7 +981,6 @@ class EventService {
 
     // Se não tem configuração, criar uma padrão
     if (!event.formConfig) {
-      console.log('🔍 getFormConfig - criando configuração padrão');
       const defaultConfig = {
         fields: [
           {
@@ -1018,6 +1017,12 @@ class EventService {
           allowMultipleSubmissions: false
         }
       };
+
+      // Salvar a configuração padrão no banco de dados
+      await prisma.event.update({
+        where: { id: eventId },
+        data: { formConfig: defaultConfig }
+      });
 
       return defaultConfig;
     }
@@ -1146,6 +1151,12 @@ class EventService {
         }
       };
 
+      // Salvar a configuração padrão no banco de dados
+      await prisma.event.update({
+        where: { id: eventId },
+        data: { formConfig: defaultConfig }
+      });
+
       return defaultConfig;
     }
 
@@ -1228,12 +1239,19 @@ class EventService {
 
   // Atualizar configuração do formulário
   static async updateFormConfig(eventId, userId, config) {
+    console.log('🔍 updateFormConfig - eventId:', eventId, 'userId:', userId);
+    console.log('🔍 updateFormConfig - config recebido:', JSON.stringify(config, null, 2));
+    
     // Primeiro, verificar se o usuário tem acesso ao evento
     const user = await prisma.user.findUnique({ where: { id: userId } });
+    console.log('🔍 updateFormConfig - user:', user);
+    
     let event;
     
     if (user.role === 'ORGANIZER') {
+      console.log('🔍 updateFormConfig - user é ORGANIZER');
       if (user.trabalharTodosEventos) {
+        console.log('🔍 updateFormConfig - trabalharTodosEventos = true, empresaId:', user.empresaId);
         // Permite se o evento for da mesma empresa
         event = await prisma.event.findFirst({ 
           where: { 
@@ -1242,42 +1260,55 @@ class EventService {
           }
         });
       } else if (user.eventosIds && user.eventosIds.includes(eventId)) {
+        console.log('🔍 updateFormConfig - evento na lista eventosIds');
         // Permite se o evento está na lista de eventosIds
         event = await prisma.event.findFirst({ 
           where: { id: eventId }
         });
       } else {
+        console.log('❌ updateFormConfig - sem permissão para ORGANIZER');
         throw new Error('Sem permissão para acessar este evento');
       }
     } else {
+      console.log('🔍 updateFormConfig - user não é ORGANIZER, verificando criador/organizador');
       // Checagem padrão: criador ou organizador relacional
       const isCreator = await prisma.event.findFirst({ 
         where: { id: eventId, userId }
       });
       
       if (isCreator) {
+        console.log('✅ updateFormConfig - user é criador do evento');
         event = isCreator;
       } else {
+        console.log('🔍 updateFormConfig - verificando se é organizador');
         // Verificar se é organizador
         const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
         if (isOrganizer) {
+          console.log('✅ updateFormConfig - user é organizador do evento');
           event = await prisma.event.findFirst({ 
             where: { id: eventId }
           });
         } else {
+          console.log('❌ updateFormConfig - sem permissão');
           throw new Error('Sem permissão para acessar este evento');
         }
       }
     }
 
     if (!event) {
+      console.log('❌ updateFormConfig - evento não encontrado');
       throw new Error('Evento não encontrado');
     }
+
+    console.log('✅ updateFormConfig - evento encontrado, fazendo update');
+    console.log('🔍 updateFormConfig - config.fields length:', config.fields?.length);
 
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
       data: { formConfig: config }
     });
+
+    console.log('✅ updateFormConfig - evento atualizado, formConfig salvo:', JSON.stringify(updatedEvent.formConfig, null, 2));
 
     return updatedEvent.formConfig;
   }
