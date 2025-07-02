@@ -71,22 +71,23 @@ const PublicEvent = () => {
       console.log('✅ fetchEventDetails - evento carregado:', eventResponse.data);
       setEvent(eventResponse.data.data);
 
-      // Se não for apenas formulário, carrega as configurações
-      if (!isFormOnly) {
-        // Carregar configuração do formulário
-        try {
-          const formEndpoint = isPreview 
-            ? (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config/preview`)
-            : (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config`);
-          
-          const formResponse = await api.get(formEndpoint);
-          console.log('✅ fetchEventDetails - formConfig carregado:', formResponse.data);
-          setFormConfig(formResponse.data.data);
-        } catch (formError) {
-          console.warn('⚠️ fetchEventDetails - Erro ao carregar formConfig:', formError);
-          // Não é crítico, pode continuar sem configuração do formulário
-        }
+      // Carregar configuração do formulário (sempre necessário)
+      try {
+        const formEndpoint = isPreview 
+          ? (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config/preview`)
+          : (isUsingSlug ? `/public/events/slug/${eventIdentifier}/form-config` : `/public/events/${eventIdentifier}/form-config`);
+        
+        console.log('🔍 fetchEventDetails - carregando formConfig, endpoint:', formEndpoint);
+        const formResponse = await api.get(formEndpoint);
+        console.log('✅ fetchEventDetails - formConfig carregado:', formResponse.data);
+        setFormConfig(formResponse.data.data);
+      } catch (formError) {
+        console.warn('⚠️ fetchEventDetails - Erro ao carregar formConfig:', formError);
+        // Não é crítico, pode continuar sem configuração do formulário
+      }
 
+      // Se não for apenas formulário, carrega as configurações da página
+      if (!isFormOnly) {
         // Carregar configuração da página
         try {
           const pageConfigEndpoint = isPreview 
