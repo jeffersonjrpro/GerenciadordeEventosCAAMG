@@ -51,18 +51,29 @@ const FormBuilder = ({ eventId, onSave }) => {
 
   const loadFormConfig = async () => {
     try {
+      console.log('🔍 FormBuilder loadFormConfig - Iniciando carregamento');
+      console.log('🔍 FormBuilder loadFormConfig - eventId:', eventId);
+      
       const response = await fetch(`/api/events/${eventId}/form-config`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      console.log('🔍 FormBuilder loadFormConfig - response status:', response.status);
+      console.log('🔍 FormBuilder loadFormConfig - response ok:', response.ok);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ FormBuilder loadFormConfig - dados recebidos:', JSON.stringify(data, null, 2));
         setConfig(data.data);
+        console.log('✅ FormBuilder loadFormConfig - config atualizado no state');
+      } else {
+        const errorData = await response.text();
+        console.error('❌ FormBuilder loadFormConfig - erro na resposta:', errorData);
       }
     } catch (error) {
-      console.error('Erro ao carregar configuração do formulário:', error);
+      console.error('❌ FormBuilder loadFormConfig - erro:', error);
     } finally {
       setLoading(false);
     }
@@ -162,6 +173,10 @@ const FormBuilder = ({ eventId, onSave }) => {
 
   const handleSave = async () => {
     try {
+      console.log('🔍 FormBuilder handleSave - Iniciando salvamento');
+      console.log('🔍 FormBuilder handleSave - eventId:', eventId);
+      console.log('🔍 FormBuilder handleSave - config:', JSON.stringify(config, null, 2));
+      
       const response = await fetch(`/api/events/${eventId}/form-config`, {
         method: 'PUT',
         headers: {
@@ -171,12 +186,21 @@ const FormBuilder = ({ eventId, onSave }) => {
         body: JSON.stringify(config)
       });
 
+      console.log('🔍 FormBuilder handleSave - response status:', response.status);
+      console.log('🔍 FormBuilder handleSave - response ok:', response.ok);
+
       if (response.ok) {
+        const data = await response.json();
+        console.log('✅ FormBuilder handleSave - resposta:', data);
         if (onSave) onSave(config);
         alert('Formulário salvo com sucesso!');
+      } else {
+        const errorData = await response.text();
+        console.error('❌ FormBuilder handleSave - erro na resposta:', errorData);
+        alert(`Erro ao salvar formulário: ${response.status} - ${errorData}`);
       }
     } catch (error) {
-      console.error('Erro ao salvar formulário:', error);
+      console.error('❌ FormBuilder handleSave - erro:', error);
       alert('Erro ao salvar formulário');
     }
   };

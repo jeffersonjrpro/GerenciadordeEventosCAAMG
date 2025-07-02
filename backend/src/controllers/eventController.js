@@ -1067,6 +1067,8 @@ class EventController {
       console.log('🔍 getPublicFormConfigBySlug - slug:', slug);
 
       const event = await EventService.getPublicEventBySlug(slug);
+      console.log('✅ getPublicFormConfigBySlug - evento encontrado:', event.id);
+      
       const config = await EventService.getPublicFormConfig(event.id);
       console.log('✅ getPublicFormConfigBySlug - config retornado:', JSON.stringify(config, null, 2));
 

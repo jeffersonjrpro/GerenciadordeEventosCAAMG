@@ -1033,6 +1033,8 @@ class EventService {
 
   // Obter configuração do formulário público (sem autenticação)
   static async getPublicFormConfig(eventId) {
+    console.log('🔍 getPublicFormConfig - eventId:', eventId);
+    
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
@@ -1047,11 +1049,15 @@ class EventService {
     });
 
     if (!event) {
+      console.log('❌ getPublicFormConfig - evento não encontrado ou não está disponível publicamente');
       throw new Error('Evento não encontrado ou não está disponível publicamente');
     }
 
+    console.log('✅ getPublicFormConfig - evento encontrado, formConfig:', event.formConfig);
+
     // Se não tem configuração, criar uma padrão
     if (!event.formConfig) {
+      console.log('🔍 getPublicFormConfig - criando configuração padrão');
       const defaultConfig = {
         fields: [
           {
@@ -1089,9 +1095,17 @@ class EventService {
         }
       };
 
+      // Salvar a configuração padrão no banco de dados
+      console.log('🔍 getPublicFormConfig - salvando configuração padrão no banco');
+      await prisma.event.update({
+        where: { id: eventId },
+        data: { formConfig: defaultConfig }
+      });
+
       return defaultConfig;
     }
 
+    console.log('✅ getPublicFormConfig - retornando configuração existente');
     return event.formConfig;
   }
 
