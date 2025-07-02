@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 // Importe seus componentes de UI ou use HTML + Tailwind
 // import { Badge, Button, Input, Select, Modal, Avatar, Textarea } from '@components/ui';
-import { Plus, Filter, Eye, Edit, XCircle, Trash2 } from 'lucide-react';
+import { Plus, Filter, Eye, Edit, XCircle, Trash2, Upload, Download, File, Paperclip } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -22,7 +22,7 @@ export default function Demandas({ sidebarCollapsed }) {
   const { user } = useAuth();
   const [setores, setSetores] = useState([]);
   const [demandas, setDemandas] = useState([]);
-  const [filtros, setFiltros] = useState({ setorId: '', status: '', prioridade: '', nomeProjeto: '', solicitacao: '' });
+  const [filtros, setFiltros] = useState({ setorId: '', status: '', prioridade: '', nomeProjeto: '', solicitacao: '', responsavelId: '', arquivada: 'false' });
   const [showModal, setShowModal] = useState(false);
   const [novaDemanda, setNovaDemanda] = useState({ solicitante: user?.name || '' });
   const [detalhe, setDetalhe] = useState(null);
@@ -33,7 +33,10 @@ export default function Demandas({ sidebarCollapsed }) {
   const [erroSetor, setErroSetor] = useState('');
   const [usuarios, setUsuarios] = useState([]);
   const [editandoDemandaId, setEditandoDemandaId] = useState(null);
-  const [estatisticas, setEstatisticas] = useState({ abertas: 0, emAndamento: 0, concluidas: 0, pausadas: 0, total: 0 });
+  const [estatisticas, setEstatisticas] = useState({ abertas: 0, emAndamento: 0, concluidas: 0, pausadas: 0, total: 0, arquivadas: 0 });
+  const [arquivos, setArquivos] = useState([]);
+  const [uploadingArquivo, setUploadingArquivo] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const carregarEstatisticas = async () => {
     try {
@@ -145,6 +148,114 @@ export default function Demandas({ sidebarCollapsed }) {
     }
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tamanho (máximo 100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error('Arquivo muito grande. Tamanho máximo: 100MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUploadArquivo = async () => {
+    if (!selectedFile || !detalhe) return;
+    
+    setUploadingArquivo(true);
+    const formData = new FormData();
+    formData.append('arquivo', selectedFile);
+
+    try {
+      await api.post(`/demandas/${detalhe.id}/arquivos`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      toast.success('Arquivo enviado com sucesso!');
+      setSelectedFile(null);
+      // Recarregar detalhes da demanda para mostrar o novo arquivo
+      const response = await api.get(`/demandas/${detalhe.id}`);
+      setDetalhe(response.data);
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast.error(error.response?.data?.error || 'Erro ao enviar arquivo');
+    } finally {
+      setUploadingArquivo(false);
+    }
+  };
+
+  const handleDownloadArquivo = async (arquivoId, nomeOriginal) => {
+    try {
+      const response = await api.get(`/demandas/arquivos/${arquivoId}/download`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', nomeOriginal);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao fazer download:', error);
+      toast.error('Erro ao fazer download do arquivo');
+    }
+  };
+
+  const handleRemoverArquivo = async (arquivoId) => {
+    if (!confirm('Tem certeza que deseja remover este arquivo?')) return;
+    
+    try {
+      await api.delete(`/demandas/arquivos/${arquivoId}`);
+      toast.success('Arquivo removido com sucesso!');
+      // Recarregar detalhes da demanda
+      const response = await api.get(`/demandas/${detalhe.id}`);
+      setDetalhe(response.data);
+    } catch (error) {
+      console.error('Erro ao remover arquivo:', error);
+      toast.error(error.response?.data?.error || 'Erro ao remover arquivo');
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleArquivarDemanda = async (demandaId) => {
+    if (!confirm('Tem certeza que deseja arquivar esta demanda?')) return;
+    
+    try {
+      await api.post(`/demandas/${demandaId}/arquivar`);
+      toast.success('Demanda arquivada com sucesso!');
+      carregarDemandas();
+    } catch (error) {
+      console.error('Erro ao arquivar demanda:', error);
+      toast.error(error.response?.data?.error || 'Erro ao arquivar demanda');
+    }
+  };
+
+  const handleDesarquivarDemanda = async (demandaId) => {
+    if (!confirm('Tem certeza que deseja desarquivar esta demanda?')) return;
+    
+    try {
+      await api.post(`/demandas/${demandaId}/desarquivar`);
+      toast.success('Demanda desarquivada com sucesso!');
+      carregarDemandas();
+    } catch (error) {
+      console.error('Erro ao desarquivar demanda:', error);
+      toast.error(error.response?.data?.error || 'Erro ao desarquivar demanda');
+    }
+  };
+
   return (
     <div className="transition-all duration-300 w-full px-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
@@ -155,7 +266,7 @@ export default function Demandas({ sidebarCollapsed }) {
       </div>
 
       {/* Cards de Estatísticas Responsivos */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-600 rounded-xl p-3 md:p-4 text-white shadow flex flex-col justify-between min-h-[80px]">
           <div className="flex justify-between items-center">
             <span className="font-semibold text-sm md:text-base">Abertas</span>
@@ -192,10 +303,20 @@ export default function Demandas({ sidebarCollapsed }) {
           </div>
           <div className="text-2xl md:text-3xl font-bold mt-2">{estatisticas.pausadas}</div>
         </div>
+        <div className="bg-purple-600 rounded-xl p-3 md:p-4 text-white shadow flex flex-col justify-between min-h-[80px]">
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-sm md:text-base">Arquivadas</span>
+            <svg className="w-6 h-6 md:w-8 md:h-8 opacity-60" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+              <polyline points="3,7 8,12 13,7"/>
+            </svg>
+          </div>
+          <div className="text-2xl md:text-3xl font-bold mt-2">{estatisticas.arquivadas}</div>
+        </div>
       </div>
 
       {/* Filtros Responsivos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2 mb-4">
         <select name="setorId" value={filtros.setorId} onChange={handleFiltro} className="input text-sm">
           <option value="">Todos Setores</option>
           {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
@@ -212,6 +333,14 @@ export default function Demandas({ sidebarCollapsed }) {
           <option value="ALTA">Alta</option>
           <option value="MEDIA">Média</option>
           <option value="BAIXA">Baixa</option>
+        </select>
+        <select name="responsavelId" value={filtros.responsavelId} onChange={handleFiltro} className="input text-sm">
+          <option value="">Todos Responsáveis</option>
+          {usuarios.map(u => <option key={u.id} value={u.id}>{u.name || u.nome}</option>)}
+        </select>
+        <select name="arquivada" value={filtros.arquivada} onChange={handleFiltro} className="input text-sm">
+          <option value="false">Ativas</option>
+          <option value="true">Arquivadas</option>
         </select>
         <input name="nomeProjeto" placeholder="Buscar projeto..." value={filtros.nomeProjeto} onChange={handleFiltro} className="input text-sm" />
         <input name="solicitacao" placeholder="Nº Solicitação" value={filtros.solicitacao || ''} onChange={handleFiltro} className="input text-sm" />
@@ -240,9 +369,16 @@ export default function Demandas({ sidebarCollapsed }) {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {demandas.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50">
+                <tr key={d.id} className={`hover:bg-gray-50 ${d.arquivada ? 'bg-gray-50 opacity-75' : ''}`}>
                   <td className="px-2 md:px-4 py-2 max-w-[120px] md:max-w-none truncate">
-                    <div className="font-medium text-sm">{d.nomeProjeto}</div>
+                    <div className="font-medium text-sm flex items-center gap-2">
+                      {d.nomeProjeto}
+                      {d.arquivada && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Arquivada
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap font-mono text-blue-700 text-sm">{d.solicitacao}</td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap text-sm">{d.setor?.nome}</td>
@@ -303,6 +439,28 @@ export default function Demandas({ sidebarCollapsed }) {
                       }}>
                         <Edit size={14}/>
                       </button>
+                      {d.arquivada ? (
+                        <button 
+                          className="btn btn-sm btn-outline text-green-600 hover:text-green-800 flex items-center p-1 md:p-2" 
+                          title="Desarquivar Demanda"
+                          onClick={() => handleDesarquivarDemanda(d.id)}
+                        >
+                          <svg size={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button 
+                          className="btn btn-sm btn-outline text-purple-600 hover:text-purple-800 flex items-center p-1 md:p-2" 
+                          title="Arquivar Demanda"
+                          onClick={() => handleArquivarDemanda(d.id)}
+                        >
+                          <svg size={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -408,6 +566,17 @@ export default function Demandas({ sidebarCollapsed }) {
                 <div><span className="font-semibold text-gray-700">Data de Entrega:</span> <span className="text-gray-900">{detalhe.dataEntrega ? new Date(detalhe.dataEntrega).toLocaleDateString('pt-BR') : '-'}</span></div>
                 {detalhe.dataTermino && <div><span className="font-semibold text-gray-700">Data de Término:</span> <span className="text-gray-900">{new Date(detalhe.dataTermino).toLocaleDateString('pt-BR')}</span></div>}
                 <div><span className="font-semibold text-gray-700">Responsáveis:</span> <span className="text-gray-900">{detalhe.responsaveis?.map(u => u.name || u.nome).join(', ') || '-'}</span></div>
+                {detalhe.arquivada && (
+                  <div>
+                    <span className="font-semibold text-gray-700">Status de Arquivamento:</span> 
+                    <span className="px-2 py-1 rounded bg-purple-100 text-purple-800 ml-2">Arquivada</span>
+                    {detalhe.dataArquivamento && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        Arquivada em: {new Date(detalhe.dataArquivamento).toLocaleString('pt-BR')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -451,8 +620,139 @@ export default function Demandas({ sidebarCollapsed }) {
               </div>
             )}
 
+            {/* Arquivos */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-semibold text-gray-700">Arquivos:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                    accept="*/*"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="btn btn-sm btn-outline flex items-center gap-2 cursor-pointer"
+                    title="Selecionar arquivo"
+                  >
+                    <Upload size={14} />
+                    Selecionar
+                  </label>
+                  {selectedFile && (
+                    <button
+                      onClick={handleUploadArquivo}
+                      disabled={uploadingArquivo}
+                      className="btn btn-sm btn-primary flex items-center gap-2"
+                    >
+                      {uploadingArquivo ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Paperclip size={14} />
+                          Enviar
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {selectedFile && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <File size={16} className="text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800">{selectedFile.name}</span>
+                      <span className="text-xs text-blue-600">({formatFileSize(selectedFile.size)})</span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedFile(null)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {detalhe.arquivos?.length > 0 ? (
+                <div className="bg-gray-50 p-4 rounded-lg border space-y-3">
+                  {detalhe.arquivos.map((arquivo) => (
+                    <div key={arquivo.id} className="bg-white p-3 rounded border flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <File size={16} className="text-gray-500" />
+                        <div>
+                          <div className="font-medium text-gray-800">{arquivo.nomeOriginal}</div>
+                          <div className="text-xs text-gray-500">
+                            {formatFileSize(arquivo.tamanho)} • Enviado por {arquivo.uploadPor?.name} • {new Date(arquivo.criadoEm).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDownloadArquivo(arquivo.id, arquivo.nomeOriginal)}
+                          className="btn btn-sm btn-outline flex items-center gap-1"
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleRemoverArquivo(arquivo.id)}
+                          className="btn btn-sm btn-outline text-red-600 hover:text-red-800 flex items-center gap-1"
+                          title="Remover"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-4 rounded-lg border text-center">
+                  <File size={24} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Nenhum arquivo anexado</p>
+                  <p className="text-gray-400 text-xs mt-1">Tamanho máximo: 100MB</p>
+                </div>
+              )}
+            </div>
+
             {/* Botões de ação */}
             <div className="flex gap-3 justify-end pt-4 border-t">
+              {detalhe.arquivada ? (
+                <button 
+                  className="btn btn-success flex items-center gap-2" 
+                  title="Desarquivar Demanda" 
+                  onClick={() => {
+                    handleDesarquivarDemanda(detalhe.id);
+                    setDetalhe(null);
+                  }}
+                >
+                  <svg size={18} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
+                  </svg>
+                  Desarquivar
+                </button>
+              ) : (
+                <button 
+                  className="btn btn-warning flex items-center gap-2" 
+                  title="Arquivar Demanda" 
+                  onClick={() => {
+                    handleArquivarDemanda(detalhe.id);
+                    setDetalhe(null);
+                  }}
+                >
+                  <svg size={18} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  Arquivar
+                </button>
+              )}
               <button className="btn btn-danger flex items-center gap-2" title="Excluir Demanda" onClick={handleExcluirDemanda}>
                 <Trash2 size={18}/>Excluir
               </button>

@@ -168,6 +168,7 @@ model User {
   agendamentosCriados Agendamento[] @relation("UserAgendamentosCriados")
   notifications Notification[]
   observacoesCriadas Observacao[] @relation("ObservacoesDoAutor")
+  arquivosUploadados ArquivoDemanda[] @relation("ArquivosUploadados")
   @@map("users")
 }
 
@@ -368,10 +369,13 @@ model Demanda {
   dataTermino    DateTime?
   linkPastaProjeto String?
   linkSite         String?
+  arquivada       Boolean     @default(false)  // Campo para arquivamento
+  dataArquivamento DateTime?  // Data quando foi arquivada
   setorId        String
   setor          Setor       @relation(fields: [setorId], references: [id])
   responsaveis   User[]   @relation("UsuariosResponsaveisDemanda")
   observacoes    Observacao[]
+  arquivos       ArquivoDemanda[]
   criadoPorId    String
   criadoPor      User        @relation("UserCriadorDemanda", fields: [criadoPorId], references: [id])
   @@map("demandas")
@@ -386,6 +390,22 @@ model Observacao {
   demandaId  String
   demanda    Demanda  @relation(fields: [demandaId], references: [id])
   @@map("observacoes")
+}
+
+model ArquivoDemanda {
+  id          String   @id @default(uuid())
+  nomeOriginal String
+  nomeArquivo  String  // Nome único do arquivo no servidor
+  caminho      String  // Caminho relativo do arquivo
+  tamanho      Int     // Tamanho em bytes
+  tipoMime     String  // Tipo MIME do arquivo
+  demandaId    String
+  demanda      Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+  uploadPorId  String
+  uploadPor    User    @relation("ArquivosUploadados", fields: [uploadPorId], references: [id])
+  criadoEm     DateTime @default(now())
+  
+  @@map("arquivos_demanda")
 }
 
 // ===== AGENDAMENTOS =====
@@ -414,10 +434,13 @@ model Agendamento {
 model Notification {
   id             String        @id @default(uuid())
   userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  agendamentoId  String
-  agendamento    Agendamento  @relation(fields: [agendamentoId], references: [id])
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  titulo         String
   mensagem       String
+  tipo           String        // NOVA_DEMANDA, OBSERVACAO, etc.
+  dados          Json?         // Dados adicionais da notificação
   lida           Boolean       @default(false)
-  criadaEm       DateTime      @default(now())
+  criadoEm       DateTime      @default(now())
+  
+  @@map("notifications")
 } 

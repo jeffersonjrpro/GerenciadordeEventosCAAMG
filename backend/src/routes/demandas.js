@@ -5,6 +5,10 @@ const { authenticateToken } = require('../middleware/auth');
 const { PrismaClient } = require('@prisma/client');
 const { Prisma } = require('@prisma/client');
 const { execSync } = require('child_process');
+const { uploadDemandaArquivo, handleDemandaUploadError } = require('../middleware/upload');
+const NotificationService = require('../services/notificationService');
+const fs = require('fs');
+const path = require('path');
 
 // Listar setores da empresa
 router.get('/setores', authenticateToken, async (req, res) => {
@@ -24,13 +28,28 @@ router.post('/setores', authenticateToken, async (req, res) => {
 // Listar demandas (com filtros)
 router.get('/demandas', authenticateToken, async (req, res) => {
   const user = req.user;
-  const { setorId, status, prioridade, nomeProjeto, solicitacao, page = 1, limit = 10 } = req.query;
+  const { setorId, status, prioridade, nomeProjeto, solicitacao, responsavelId, arquivada, page = 1, limit = 10 } = req.query;
   const where = { setor: { empresaId: user.empresaId } };
+  
+  // Por padrão, mostrar apenas demandas não arquivadas
+  if (arquivada === undefined || arquivada === 'false') {
+    where.arquivada = false;
+  } else if (arquivada === 'true') {
+    where.arquivada = true;
+  }
+  
   if (setorId) where.setorId = setorId;
   if (status) where.status = status;
   if (prioridade) where.prioridade = prioridade;
   if (nomeProjeto) where.nomeProjeto = { contains: nomeProjeto, mode: 'insensitive' };
   if (solicitacao) where.solicitacao = solicitacao;
+  if (responsavelId) {
+    where.responsaveis = {
+      some: {
+        id: responsavelId
+      }
+    };
+  }
   let pageNum = parseInt(page);
   let limitNum = parseInt(limit);
   if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
@@ -40,9 +59,25 @@ router.get('/demandas', authenticateToken, async (req, res) => {
   const [demandas, total] = await Promise.all([
     prisma.demanda.findMany({
       where,
-      include: { setor: true, responsaveis: true, observacoes: true },
+      include: { 
+        setor: true, 
+        responsaveis: true, 
+        observacoes: true,
+        arquivos: {
+          include: {
+            uploadPor: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      },
       skip,
-      take
+      take,
+      orderBy: { dataAbertura: 'desc' }
     }),
     prisma.demanda.count({ where })
   ]);
@@ -179,10 +214,33 @@ router.post('/demandas', authenticateToken, async (req, res) => {
         ...(observacoesData && { observacoes: observacoesData }),
         criadoPorId: user.id
       },
-      include: { setor: true, responsaveis: true, observacoes: true }
+      include: { 
+        setor: true, 
+        responsaveis: true, 
+        observacoes: true,
+        criadoPor: {
+          select: {
+            id: true,
+            name: true,
+            nome: true
+          }
+        }
+      }
     });
     
     console.log('✅ POST /demandas - Demanda criada com sucesso:', demanda.id);
+    
+    // Enviar notificações para os responsáveis (se houver)
+    if (demanda.responsaveis && demanda.responsaveis.length > 0) {
+      try {
+        await NotificationService.createDemandaNotification(demanda, demanda.responsaveis);
+        console.log('✅ POST /demandas - Notificações enviadas para os responsáveis');
+      } catch (notificationError) {
+        console.error('⚠️ POST /demandas - Erro ao enviar notificações:', notificationError);
+        // Não falhar a criação da demanda se as notificações falharem
+      }
+    }
+    
     res.json(demanda);
   } catch (error) {
     console.error('❌ POST /demandas - Erro ao criar demanda:', error);
@@ -288,14 +346,18 @@ router.get('/demandas/estatisticas', authenticateToken, async (req, res) => {
     const setoresIds = setores.map(s => s.id);
     
     const where = { setorId: { in: setoresIds } };
-    const [abertas, emAndamento, concluidas, pausadas, total] = await Promise.all([
-      prisma.demanda.count({ where: { ...where, status: 'ABERTO' } }),
-      prisma.demanda.count({ where: { ...where, status: 'EM_ANDAMENTO' } }),
-      prisma.demanda.count({ where: { ...where, status: 'CONCLUIDO' } }),
-      prisma.demanda.count({ where: { ...where, status: 'PAUSADO' } }),
-      prisma.demanda.count({ where })
+    const whereNaoArquivadas = { ...where, arquivada: false };
+    const whereArquivadas = { ...where, arquivada: true };
+    
+    const [abertas, emAndamento, concluidas, pausadas, total, arquivadas] = await Promise.all([
+      prisma.demanda.count({ where: { ...whereNaoArquivadas, status: 'ABERTO' } }),
+      prisma.demanda.count({ where: { ...whereNaoArquivadas, status: 'EM_ANDAMENTO' } }),
+      prisma.demanda.count({ where: { ...whereNaoArquivadas, status: 'CONCLUIDO' } }),
+      prisma.demanda.count({ where: { ...whereNaoArquivadas, status: 'PAUSADO' } }),
+      prisma.demanda.count({ where: whereNaoArquivadas }),
+      prisma.demanda.count({ where: whereArquivadas })
     ]);
-    res.json({ abertas, emAndamento, concluidas, pausadas, total });
+    res.json({ abertas, emAndamento, concluidas, pausadas, total, arquivadas });
   } catch (error) {
     console.error('Erro no endpoint estatisticas:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
@@ -319,7 +381,23 @@ router.get('/demandas/:id', authenticateToken, async (req, res) => {
   const user = req.user;
   const demanda = await prisma.demanda.findUnique({
     where: { id: req.params.id },
-    include: { setor: true, responsaveis: true, observacoes: { include: { autor: true } } }
+    include: { 
+      setor: true, 
+      responsaveis: true, 
+      observacoes: { include: { autor: true } },
+      arquivos: {
+        include: {
+          uploadPor: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { criadoEm: 'desc' }
+      }
+    }
   });
   if (!demanda || demanda.setor.empresaId !== user.empresaId) return res.status(404).json({ error: 'Demanda não encontrada' });
   res.json(demanda);
@@ -336,6 +414,327 @@ router.post('/demandas/:id/observacoes', authenticateToken, async (req, res) => 
     data: { texto, autorId: user.id, demandaId: req.params.id }
   });
   res.json(observacao);
+});
+
+// Upload de arquivo para demanda
+router.post('/demandas/:id/arquivos', authenticateToken, uploadDemandaArquivo, handleDemandaUploadError, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    // Verificar se a demanda existe e pertence à empresa do usuário
+    const demanda = await prisma.demanda.findFirst({
+      where: { 
+        id: id,
+        setor: { empresaId: user.empresaId }
+      }
+    });
+
+    if (!demanda) {
+      return res.status(404).json({ error: 'Demanda não encontrada' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
+    }
+
+    // Criar registro do arquivo no banco
+    const arquivo = await prisma.arquivoDemanda.create({
+      data: {
+        nomeOriginal: req.file.originalname,
+        nomeArquivo: req.file.filename,
+        caminho: `/uploads/demandas/${req.file.filename}`,
+        tamanho: req.file.size,
+        tipoMime: req.file.mimetype,
+        demandaId: id,
+        uploadPorId: user.id
+      },
+      include: {
+        uploadPor: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: 'Arquivo enviado com sucesso',
+      data: arquivo
+    });
+  } catch (error) {
+    console.error('Erro ao fazer upload do arquivo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Listar arquivos de uma demanda
+router.get('/demandas/:id/arquivos', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    // Verificar se a demanda existe e pertence à empresa do usuário
+    const demanda = await prisma.demanda.findFirst({
+      where: { 
+        id: id,
+        setor: { empresaId: user.empresaId }
+      }
+    });
+
+    if (!demanda) {
+      return res.status(404).json({ error: 'Demanda não encontrada' });
+    }
+
+    // Buscar arquivos da demanda
+    const arquivos = await prisma.arquivoDemanda.findMany({
+      where: { demandaId: id },
+      include: {
+        uploadPor: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { criadoEm: 'desc' }
+    });
+
+    res.json({ data: arquivos });
+  } catch (error) {
+    console.error('Erro ao listar arquivos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Download de arquivo
+router.get('/demandas/arquivos/:arquivoId/download', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const { arquivoId } = req.params;
+
+    // Buscar arquivo e verificar permissões
+    const arquivo = await prisma.arquivoDemanda.findFirst({
+      where: { 
+        id: arquivoId,
+        demanda: {
+          setor: { empresaId: user.empresaId }
+        }
+      },
+      include: {
+        demanda: {
+          include: {
+            setor: true
+          }
+        }
+      }
+    });
+
+    if (!arquivo) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+
+    const filePath = path.join(__dirname, '..', '..', arquivo.caminho);
+    
+    // Verificar se o arquivo existe fisicamente
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    }
+
+    // Configurar headers para download
+    res.setHeader('Content-Type', arquivo.tipoMime);
+    res.setHeader('Content-Disposition', `attachment; filename="${arquivo.nomeOriginal}"`);
+    res.setHeader('Content-Length', arquivo.tamanho);
+
+    // Enviar arquivo
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Erro ao fazer download do arquivo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Remover arquivo
+router.delete('/demandas/arquivos/:arquivoId', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const { arquivoId } = req.params;
+
+    // Buscar arquivo e verificar permissões
+    const arquivo = await prisma.arquivoDemanda.findFirst({
+      where: { 
+        id: arquivoId,
+        demanda: {
+          setor: { empresaId: user.empresaId }
+        }
+      },
+      include: {
+        demanda: {
+          include: {
+            setor: true
+          }
+        }
+      }
+    });
+
+    if (!arquivo) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+
+    // Verificar se o usuário tem permissão (responsável ou criador da demanda)
+    const temPermissao = arquivo.uploadPorId === user.id || 
+                        arquivo.demanda.criadoPorId === user.id ||
+                        arquivo.demanda.responsaveis.some(r => r.id === user.id);
+
+    if (!temPermissao && user.nivel !== 'ADMIN' && user.nivel !== 'PROPRIETARIO') {
+      return res.status(403).json({ error: 'Sem permissão para remover este arquivo' });
+    }
+
+    // Remover arquivo físico
+    const filePath = path.join(__dirname, '..', '..', arquivo.caminho);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Remover registro do banco
+    await prisma.arquivoDemanda.delete({
+      where: { id: arquivoId }
+    });
+
+    res.json({ message: 'Arquivo removido com sucesso' });
+  } catch (error) {
+    console.error('Erro ao remover arquivo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Arquivar demanda
+router.post('/demandas/:id/arquivar', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    // Verificar se a demanda existe e pertence à empresa do usuário
+    const demanda = await prisma.demanda.findFirst({
+      where: { 
+        id: id,
+        setor: { empresaId: user.empresaId }
+      }
+    });
+
+    if (!demanda) {
+      return res.status(404).json({ error: 'Demanda não encontrada' });
+    }
+
+    // Verificar se o usuário tem permissão (responsável, criador ou admin)
+    const temPermissao = demanda.criadoPorId === user.id || 
+                        demanda.responsaveis.some(r => r.id === user.id) ||
+                        user.nivel === 'ADMIN' || 
+                        user.nivel === 'PROPRIETARIO';
+
+    if (!temPermissao) {
+      return res.status(403).json({ error: 'Sem permissão para arquivar esta demanda' });
+    }
+
+    // Arquivar a demanda
+    const demandaArquivada = await prisma.demanda.update({
+      where: { id: id },
+      data: {
+        arquivada: true,
+        dataArquivamento: new Date()
+      },
+      include: { 
+        setor: true, 
+        responsaveis: true, 
+        observacoes: true,
+        arquivos: {
+          include: {
+            uploadPor: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Demanda arquivada com sucesso',
+      data: demandaArquivada
+    });
+  } catch (error) {
+    console.error('Erro ao arquivar demanda:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Desarquivar demanda
+router.post('/demandas/:id/desarquivar', authenticateToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    // Verificar se a demanda existe e pertence à empresa do usuário
+    const demanda = await prisma.demanda.findFirst({
+      where: { 
+        id: id,
+        setor: { empresaId: user.empresaId }
+      }
+    });
+
+    if (!demanda) {
+      return res.status(404).json({ error: 'Demanda não encontrada' });
+    }
+
+    // Verificar se o usuário tem permissão (responsável, criador ou admin)
+    const temPermissao = demanda.criadoPorId === user.id || 
+                        demanda.responsaveis.some(r => r.id === user.id) ||
+                        user.nivel === 'ADMIN' || 
+                        user.nivel === 'PROPRIETARIO';
+
+    if (!temPermissao) {
+      return res.status(403).json({ error: 'Sem permissão para desarquivar esta demanda' });
+    }
+
+    // Desarquivar a demanda
+    const demandaDesarquivada = await prisma.demanda.update({
+      where: { id: id },
+      data: {
+        arquivada: false,
+        dataArquivamento: null
+      },
+      include: { 
+        setor: true, 
+        responsaveis: true, 
+        observacoes: true,
+        arquivos: {
+          include: {
+            uploadPor: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Demanda desarquivada com sucesso',
+      data: demandaDesarquivada
+    });
+  } catch (error) {
+    console.error('Erro ao desarquivar demanda:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 module.exports = router; 

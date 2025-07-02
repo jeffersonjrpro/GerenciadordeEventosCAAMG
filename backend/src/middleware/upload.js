@@ -86,7 +86,80 @@ const handleUploadError = (error, req, res, next) => {
   next(error);
 };
 
+// Configuração para upload de arquivos de demandas
+const demandaStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/demandas';
+    console.log('📁 Upload demanda destination:', uploadDir);
+    
+    // Criar diretório se não existir
+    if (!fs.existsSync(uploadDir)) {
+      console.log('📁 Criando diretório:', uploadDir);
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Gerar nome único para o arquivo
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+    console.log('📄 Nome do arquivo demanda gerado:', filename);
+    cb(null, filename);
+  }
+});
+
+// Filtro para arquivos de demandas (aceita qualquer tipo)
+const demandaFileFilter = (req, file, cb) => {
+  console.log('🔍 Verificando arquivo demanda:', file.originalname, 'MIME:', file.mimetype);
+  console.log('✅ Arquivo aceito para demanda');
+  cb(null, true);
+};
+
+// Configurar multer para demandas
+const uploadDemanda = multer({
+  storage: demandaStorage,
+  fileFilter: demandaFileFilter,
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB
+  }
+});
+
+// Middleware para upload de arquivos de demanda
+const uploadDemandaArquivo = uploadDemanda.single('arquivo');
+
+// Middleware para tratamento de erros de upload de demandas
+const handleDemandaUploadError = (error, req, res, next) => {
+  console.error('Erro no upload de demanda:', error);
+  
+  if (error instanceof multer.MulterError) {
+    console.error('Erro Multer demanda:', error.code);
+    
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        error: 'Arquivo muito grande. Tamanho máximo: 100MB'
+      });
+    }
+    
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        error: 'Campo de arquivo inesperado'
+      });
+    }
+    
+    return res.status(400).json({
+      error: 'Erro no upload do arquivo',
+      details: error.message
+    });
+  }
+  
+  console.error('Erro não tratado no upload de demanda:', error);
+  next(error);
+};
+
 module.exports = {
   uploadEventImage,
-  handleUploadError
+  handleUploadError,
+  uploadDemandaArquivo,
+  handleDemandaUploadError
 }; 

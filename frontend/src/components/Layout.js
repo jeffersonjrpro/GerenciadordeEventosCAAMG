@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/logo.png';
 import logoPreta from '../assets/logo-preta.png';
+import NotificationBell from './NotificationBell';
 import {
   Calendar,
   Users,
@@ -200,16 +201,38 @@ const Layout = () => {
           <span className={`text-xs mt-2 ${darkMode ? 'text-white opacity-60' : 'text-gray-500 opacity-80'}`}>v2.3.1</span>
         </div>
       </div>
-      {/* Conteúdo principal */}
-      <div className="ml-72 min-h-screen flex flex-col">
-        <main className="flex-1 overflow-y-auto">
-          <div className="py-6">
-            <div className="w-full px-2 sm:px-4 transition-all duration-300">
-              <Outlet />
+
+      {/* Header com notificações */}
+      <div className={`${sidebarCollapsed ? 'ml-20' : 'ml-72'} transition-all duration-300`}>
+        <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-semibold text-gray-900">
+                {filteredNavigation.find(item => isActive(item.href))?.name || 'Dashboard'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  {(user?.name || user?.nome || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-gray-900">{user?.name || user?.nome}</p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
+                </div>
+              </div>
             </div>
           </div>
-        </main>
+        </header>
       </div>
+
+      {/* Conteúdo principal */}
+      <main className={`${sidebarCollapsed ? 'ml-20' : 'ml-72'} transition-all duration-300 pt-20`}>
+        <div className="p-6">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
 };
