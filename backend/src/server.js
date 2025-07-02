@@ -26,6 +26,9 @@ const agendamentoRoutes = require('./routes/agendamentos');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Configurar trust proxy para funcionar com rate limiting atrás de proxy/load balancer
+app.set('trust proxy', 1);
+
 // Middleware de segurança
 app.use(helmet({
   contentSecurityPolicy: {
