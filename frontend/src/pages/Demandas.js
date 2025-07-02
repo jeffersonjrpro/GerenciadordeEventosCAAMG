@@ -208,7 +208,7 @@ export default function Demandas({ sidebarCollapsed }) {
   };
 
   const handleRemoverArquivo = async (arquivoId) => {
-    if (!confirm('Tem certeza que deseja remover este arquivo?')) return;
+    if (!window.confirm('Tem certeza que deseja remover este arquivo?')) return;
     
     try {
       await api.delete(`/demandas/arquivos/${arquivoId}`);
@@ -231,7 +231,7 @@ export default function Demandas({ sidebarCollapsed }) {
   };
 
   const handleArquivarDemanda = async (demandaId) => {
-    if (!confirm('Tem certeza que deseja arquivar esta demanda?')) return;
+    if (!window.confirm('Tem certeza que deseja arquivar esta demanda?')) return;
     
     try {
       await api.post(`/demandas/${demandaId}/arquivar`);
@@ -244,7 +244,7 @@ export default function Demandas({ sidebarCollapsed }) {
   };
 
   const handleDesarquivarDemanda = async (demandaId) => {
-    if (!confirm('Tem certeza que deseja desarquivar esta demanda?')) return;
+    if (!window.confirm('Tem certeza que deseja desarquivar esta demanda?')) return;
     
     try {
       await api.post(`/demandas/${demandaId}/desarquivar`);
