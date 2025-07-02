@@ -222,7 +222,7 @@ router.post('/demandas', authenticateToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            nome: true
+            email: true
           }
         }
       }
