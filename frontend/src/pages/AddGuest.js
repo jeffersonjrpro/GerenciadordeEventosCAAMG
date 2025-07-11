@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
@@ -7,7 +7,6 @@ import {
   Mail,
   Phone,
   CheckCircle,
-  XCircle,
   Clock,
   Save,
   QrCode as QrCodeIcon,
@@ -24,16 +23,7 @@ const AddGuest = () => {
   const [guest, setGuest] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', phone: '', confirmed: false, customFields: {} });
 
-  useEffect(() => {
-    fetchEvent();
-    if (guestId) {
-      fetchGuest();
-    } else {
-      setLoading(false);
-    }
-  }, [eventId, guestId]);
-
-  const fetchEvent = async () => {
+  const fetchEvent = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/events/${eventId}`);
@@ -43,9 +33,9 @@ const AddGuest = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
 
-  const fetchGuest = async () => {
+  const fetchGuest = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/guests/events/${eventId}/guests/${guestId}/details`);
@@ -63,7 +53,16 @@ const AddGuest = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, guestId]);
+
+  useEffect(() => {
+    fetchEvent();
+    if (guestId) {
+      fetchGuest();
+    } else {
+      setLoading(false);
+    }
+  }, [fetchEvent, fetchGuest, guestId]);
 
   const getCustomFields = () => {
     if (event?.formConfig?.fields) {

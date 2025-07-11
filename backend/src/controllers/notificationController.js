@@ -7,8 +7,7 @@ module.exports = {
       const { id: userId } = req.user;
       const notificacoes = await prisma.notification.findMany({
         where: { userId },
-        orderBy: { criadaEm: 'desc' },
-        include: { agendamento: true }
+        orderBy: { criadoEm: 'desc' }
       });
       return res.json(notificacoes);
     } catch (error) {

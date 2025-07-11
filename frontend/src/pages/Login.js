@@ -130,12 +130,12 @@ const Login = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Esqueceu sua senha?{' '}
-              <a
-                href="#"
+              <button
+                type="button"
                 className="font-medium text-primary-600 hover:text-primary-500"
               >
                 Clique aqui
-              </a>
+              </button>
             </p>
           </div>
         </form>

@@ -251,13 +251,27 @@ class GuestController {
       const { eventId } = req.params;
       const { search, status, presence } = req.query;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -354,13 +368,27 @@ class GuestController {
       const { eventId } = req.params;
       const { name, email, phone } = req.body;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -414,13 +442,27 @@ class GuestController {
       const { eventId, guestId } = req.params;
       const { name, email, phone } = req.body;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -475,13 +517,27 @@ class GuestController {
     try {
       const { eventId, guestId } = req.params;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -533,13 +589,27 @@ class GuestController {
     try {
       const { eventId, guestId } = req.params;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -560,6 +630,14 @@ class GuestController {
         return res.status(404).json({
           success: false,
           message: 'Convidado não encontrado'
+        });
+      }
+
+      // Verificar se já foi confirmado
+      if (existingGuest.confirmed) {
+        return res.status(400).json({
+          success: false,
+          message: 'Convidado já foi confirmado'
         });
       }
 
@@ -593,16 +671,33 @@ class GuestController {
     try {
       const { eventId } = req.params;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        },
-        include: {
-          formConfig: true
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          },
+          include: {
+            formConfig: true
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          },
+          include: {
+            formConfig: true
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -723,13 +818,27 @@ class GuestController {
       const { eventId } = req.params;
       const { status, presence } = req.query;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -871,13 +980,27 @@ class GuestController {
     try {
       const { eventId, guestId } = req.params;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({
@@ -906,9 +1029,24 @@ class GuestController {
         });
       }
 
+      // Processar campos personalizados
+      let customFields = {};
+      if (guest.customFields) {
+        try {
+          customFields = typeof guest.customFields === 'string' 
+            ? JSON.parse(guest.customFields) 
+            : guest.customFields;
+        } catch (error) {
+          console.error('Erro ao processar campos personalizados:', error);
+        }
+      }
+
       res.json({
         success: true,
-        data: guest
+        data: {
+          ...guest,
+          customFields
+        }
       });
     } catch (error) {
       console.error('Erro ao buscar convidado:', error);
@@ -924,13 +1062,27 @@ class GuestController {
     try {
       const { eventId, guestId } = req.params;
 
-      // Verificar se o evento existe e pertence ao usuário
-      const event = await prisma.event.findFirst({
-        where: {
-          id: eventId,
-          userId: req.user.id
-        }
-      });
+      // Verificar se o evento existe e usuário tem acesso
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      let event;
+      
+      if (user.empresaId) {
+        // Todos os usuários da empresa podem acessar eventos da empresa
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            empresaId: user.empresaId
+          }
+        });
+      } else {
+        // Se não tem empresaId, verificar se é criador do evento
+        event = await prisma.event.findFirst({
+          where: {
+            id: eventId,
+            userId: req.user.id
+          }
+        });
+      }
 
       if (!event) {
         return res.status(404).json({

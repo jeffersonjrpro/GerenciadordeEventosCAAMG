@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../services/api';
 
@@ -9,11 +9,7 @@ const RelatorioConsumo = () => {
   const [selectedSubEvento, setSelectedSubEvento] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    carregarEstatisticas();
-  }, [eventId]);
-
-  const carregarEstatisticas = async () => {
+  const carregarEstatisticas = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/eventos/${eventId}/subeventos/estatisticas`);
@@ -23,7 +19,11 @@ const RelatorioConsumo = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    carregarEstatisticas();
+  }, [carregarEstatisticas]);
 
   const carregarRelatorioDetalhado = async (subEventoId) => {
     try {

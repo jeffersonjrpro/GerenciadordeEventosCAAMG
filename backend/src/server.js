@@ -8,6 +8,9 @@ require('dotenv').config();
 // Importar inicialização do banco
 const { initializeDatabase } = require('./config/init');
 
+// Importar scheduler
+const SchedulerService = require('./services/schedulerService');
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const eventRoutes = require('./routes/events');
@@ -26,19 +29,22 @@ const agendamentoRoutes = require('./routes/agendamentos');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Inicializar scheduler
+const scheduler = new SchedulerService();
+
 // Configurar trust proxy para funcionar com rate limiting atrás de proxy/load balancer
 app.set('trust proxy', 1);
 
 // Middleware de segurança
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "frame-ancestors": ["'self'", "http://localhost:3000"],
-      "img-src": ["'self'", "data:", "blob:"],
-    },
-  },
-}));
+// app.use(helmet({
+//   contentSecurityPolicy: {
+//     directives: {
+//       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+//       "frame-ancestors": ["'self'", "http://localhost:3000"],
+//       "img-src": ["'self'", "data:", "blob:", "http://localhost:5000", "http://localhost:3000"],
+//     },
+//   },
+// }));
 
 // CORS
 app.use(cors({
@@ -144,10 +150,26 @@ app.listen(PORT, async () => {
     // Inicializar estruturas necessárias
     await initializeDatabase();
     
+    // Iniciar scheduler de notificações
+    scheduler.start();
+    
     await prisma.$disconnect();
   } catch (error) {
     console.error('❌ Erro ao conectar com o banco:', error);
   }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Recebido SIGTERM, parando servidor...');
+  scheduler.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 Recebido SIGINT, parando servidor...');
+  scheduler.stop();
+  process.exit(0);
 });
 
 module.exports = app; 

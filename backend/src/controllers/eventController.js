@@ -13,8 +13,8 @@ class EventController {
     body('description')
       .optional()
       .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Descrição deve ter no máximo 1000 caracteres'),
+      .isLength({ max: 50000 })
+      .withMessage('Descrição deve ter no máximo 50000 caracteres'),
     body('date')
       .notEmpty()
       .withMessage('Data é obrigatória')
@@ -63,8 +63,8 @@ class EventController {
     body('description')
       .optional()
       .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Descrição deve ter no máximo 1000 caracteres'),
+      .isLength({ max: 50000 })
+      .withMessage('Descrição deve ter no máximo 50000 caracteres'),
     body('date')
       .optional()
       .custom((value) => {
@@ -338,11 +338,54 @@ class EventController {
       const { eventId } = req.params;
       const userId = req.user.id;
 
+      // Buscar informações do evento e do criador
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      if (!event) {
+        return res.status(404).json({
+          error: 'Evento não encontrado'
+        });
+      }
+
       // Verificar se o usuário tem permissão para deletar o evento (apenas OWNER)
       const hasPermission = await OrganizerService.hasPermission(eventId, userId, 'OWNER');
       if (!hasPermission) {
+        // Buscar informações do criador do evento
+        const eventOwner = await prisma.eventOrganizer.findFirst({
+          where: {
+            eventId,
+            role: 'OWNER'
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        });
+
         return res.status(403).json({
-          error: 'Sem permissão para deletar este evento'
+          error: 'Sem permissão para deletar este evento',
+          message: 'Apenas o criador do evento pode excluí-lo',
+          eventOwner: eventOwner ? {
+            name: eventOwner.user.name,
+            email: eventOwner.user.email
+          } : null,
+          eventName: event.name
         });
       }
 
@@ -420,14 +463,8 @@ class EventController {
   // Buscar estatísticas de eventos do usuário
   static async getEventStatistics(req, res) {
     try {
-      console.log('=== DEBUG ESTATISTICAS ===');
-      console.log('req.user:', req.user);
-      console.log('user.id:', req.user.id);
-      console.log('user.empresaId:', req.user.empresaId);
-      
       const stats = await EventService.getEventStatistics(req.user.id, req.user.empresaId);
 
-      console.log('Estatísticas calculadas:', stats);
       res.json(stats);
     } catch (error) {
       console.error('Erro ao buscar estatísticas de eventos:', error);
@@ -1128,6 +1165,45 @@ class EventController {
         success: false,
         message: 'Erro interno do servidor'
       });
+    }
+  }
+
+  // Endpoint para listar eventos da empresa logada
+  static async listarEventosDaEmpresa(req, res) {
+    try {
+      const { empresaId } = req.user;
+      const eventos = await prisma.event.findMany({
+        where: { empresaId }
+      });
+      res.json(eventos);
+    } catch (error) {
+      res.status(500).json({ error: 'Erro ao buscar eventos da empresa' });
+    }
+  }
+
+  // Endpoint para listar eventos permitidos ao usuário logado
+  static async listarEventosDoUsuario(req, res) {
+    try {
+      const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+      
+      // Usar o EventService.getUserEvents que tem a lógica completa
+      const result = await EventService.getUserEvents(req.user.id, {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search,
+        status
+      });
+      
+      const response = {
+        data: result.events,
+        pagination: result.pagination
+      };
+      
+      res.json(response);
+    } catch (error) {
+      console.error('❌ Erro ao buscar eventos do usuário:', error);
+      console.error('❌ Stack trace:', error.stack);
+      res.status(500).json({ error: 'Erro ao buscar eventos do usuário' });
     }
   }
 }

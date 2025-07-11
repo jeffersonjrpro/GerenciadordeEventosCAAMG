@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import QRCodeScanner from './QRCodeScanner';
@@ -18,11 +18,7 @@ const SubEventosManager = () => {
     limitePorConvidado: 1
   });
 
-  useEffect(() => {
-    carregarSubEventos();
-  }, [eventId]);
-
-  const carregarSubEventos = async () => {
+  const carregarSubEventos = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/eventos/${eventId}/subeventos`);
@@ -32,7 +28,11 @@ const SubEventosManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    carregarSubEventos();
+  }, [carregarSubEventos]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -23,6 +23,9 @@ app.use('/api', require('./routes/demandas'));
 app.use('/api', require('./routes/agendamentos'));
 app.use('/api', require('./routes/notifications'));
 
+// Rotas públicas (devem vir antes das rotas protegidas)
+app.use('/api/public', require('./routes/public'));
+
 // Rotas do admin
 app.use('/api/admin', require('./routes/admin/auth'));
 app.use('/api/admin', require('./routes/admin/empresas'));

@@ -22,9 +22,13 @@ class AuthController {
       .trim()
       .isLength({ min: 10 })
       .withMessage('Telefone deve ter pelo menos 10 dígitos'),
-    body('nomeEmpresa')
+    body('codigoEmpresa')
       .optional()
-      .trim()
+      .trim(),
+    body('nomeEmpresa')
+      .if((value, { req }) => !req.body.codigoEmpresa)
+      .notEmpty()
+      .withMessage('Nome da empresa é obrigatório se não informar o código')
       .isLength({ min: 2 })
       .withMessage('Nome da empresa deve ter pelo menos 2 caracteres')
   ];
@@ -87,14 +91,15 @@ class AuthController {
         });
       }
 
-      const { name, email, password, telefone, nomeEmpresa } = req.body;
+      const { name, email, password, telefone, nomeEmpresa, codigoEmpresa } = req.body;
 
       const result = await AuthService.register({
         name,
         email,
         password,
         telefone,
-        nomeEmpresa
+        nomeEmpresa,
+        codigoEmpresa
       });
 
       res.status(201).json({
@@ -206,7 +211,12 @@ class AuthController {
           error: error.message
         });
       }
-
+      // Adicionar tratamento para código de empresa inválido
+      if (error.message.includes('Código de empresa inválido')) {
+        return res.status(400).json({
+          error: error.message
+        });
+      }
       res.status(500).json({
         error: 'Erro interno do servidor'
       });
@@ -291,9 +301,15 @@ class AuthController {
   // Verificar token (rota de teste)
   static async verifyToken(req, res) {
     try {
+      console.log('=== DEBUG VERIFY TOKEN ===');
+      console.log('User ID from token:', req.user.id);
+      
+      const user = await AuthService.getUserById(req.user.id);
+      console.log('User found:', user ? 'Yes' : 'No');
+      
       res.json({
         message: 'Token válido',
-        user: req.user
+        data: { user }
       });
     } catch (error) {
       console.error('Erro ao verificar token:', error);

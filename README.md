@@ -2,6 +2,300 @@
 
 Sistema completo de gerenciamento de eventos com confirmação de presença via QR Code, desenvolvido como plataforma SaaS com suporte a múltiplas empresas e organizadores.
 
+## 📋 Requisitos do Sistema
+
+### 🔧 Requisitos Mínimos
+- **Node.js**: Versão 18.0 ou superior
+- **PostgreSQL**: Versão 12.0 ou superior
+- **NPM**: Versão 8.0 ou superior
+- **Sistema Operacional**: Windows, Linux ou macOS
+
+### 📦 Dependências Principais
+- **Backend**: Node.js com Express, Prisma, JWT, Multer
+- **Frontend**: React 18, TailwindCSS, FullCalendar
+- **Banco de Dados**: PostgreSQL
+- **Scheduler**: node-cron (para notificações automáticas)
+- **Upload de Arquivos**: SMB (Windows) ou Local
+
+## 🚀 Instalação e Configuração
+
+### 1. **Clone o Repositório**
+```bash
+git clone [URL_DO_REPOSITORIO]
+cd GerenciadordeEventosCAAMG
+```
+
+### 2. **Configuração do Banco de Dados**
+```bash
+# Instalar PostgreSQL
+# Windows: https://www.postgresql.org/download/windows/
+# Linux: sudo apt-get install postgresql postgresql-contrib
+# macOS: brew install postgresql
+
+# Criar banco de dados
+createdb gerenciador_eventos
+```
+
+### 3. **Configuração do Backend**
+```bash
+cd backend
+
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+```
+
+#### **Arquivo .env (Backend)**
+```env
+# Configurações do Banco
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/gerenciador_eventos"
+
+# JWT Secret
+JWT_SECRET="sua_chave_secreta_muito_segura"
+
+# Configurações do Servidor
+PORT=5000
+NODE_ENV=production
+
+# Configurações de Email (opcional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seu_email@gmail.com
+SMTP_PASS=sua_senha_app
+
+# Configurações de Upload (SMB ou Local)
+UPLOAD_TYPE=local
+# Para SMB:
+SMB_HOST=192.168.1.100
+SMB_USERNAME=usuario
+SMB_PASSWORD=senha
+SMB_SHARE=arquivos
+SMB_DOMAIN=WORKGROUP
+
+# Para Local:
+UPLOAD_PATH=./uploads
+```
+
+### 4. **Configuração do Frontend**
+```bash
+cd ../frontend
+
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+```
+
+#### **Arquivo .env (Frontend)**
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_UPLOAD_URL=http://localhost:5000/uploads
+```
+
+### 5. **Inicialização do Banco de Dados**
+```bash
+cd backend
+
+# Gerar e aplicar migrações
+npx prisma generate
+npx prisma migrate deploy
+
+# Criar usuário administrador master
+node create-admin-master.js
+```
+
+### 6. **Instalação de Dependências Adicionais**
+```bash
+# Backend - Scheduler para notificações
+cd backend
+npm install node-cron
+
+# Frontend - Dependências específicas
+cd ../frontend
+npm install @fullcalendar/react @fullcalendar/daygrid @fullcalendar/timegrid
+npm install react-quill dayjs
+```
+
+## 🔧 Configurações Específicas
+
+### **Sistema de Upload de Arquivos**
+
+#### **Opção 1: Upload Local**
+```env
+UPLOAD_TYPE=local
+UPLOAD_PATH=./uploads
+```
+
+#### **Opção 2: Upload SMB (Windows)**
+```env
+UPLOAD_TYPE=smb
+SMB_HOST=192.168.1.100
+SMB_USERNAME=usuario
+SMB_PASSWORD=senha
+SMB_SHARE=arquivos
+SMB_DOMAIN=WORKGROUP
+```
+
+### **Sistema de Notificações**
+O sistema inclui um **scheduler automático** que:
+- Verifica agendamentos a cada minuto
+- Cria notificações no momento correto
+- Funciona automaticamente sem configuração adicional
+
+### **Configurações de Segurança**
+```env
+# JWT Secret (mínimo 32 caracteres)
+JWT_SECRET="sua_chave_secreta_muito_segura_aqui_32_chars"
+
+# Rate Limiting
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX=100
+```
+
+## 🚀 Executando o Sistema
+
+### **Desenvolvimento**
+```bash
+# Terminal 1 - Backend
+cd backend
+npm run dev
+
+# Terminal 2 - Frontend
+cd frontend
+npm start
+```
+
+### **Produção**
+```bash
+# Backend
+cd backend
+npm run build
+npm start
+
+# Frontend
+cd frontend
+npm run build
+# Servir arquivos estáticos com nginx/apache
+```
+
+## 📊 Estrutura do Projeto
+
+```
+GerenciadordeEventosCAAMG/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/     # Controladores da API
+│   │   ├── services/        # Serviços de negócio
+│   │   ├── routes/          # Rotas da API
+│   │   ├── middleware/      # Middlewares
+│   │   └── config/          # Configurações
+│   ├── prisma/              # Schema e migrações
+│   └── uploads/             # Arquivos enviados
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # Componentes React
+│   │   ├── pages/           # Páginas da aplicação
+│   │   ├── contexts/        # Contextos React
+│   │   └── services/        # Serviços do frontend
+│   └── public/              # Arquivos estáticos
+└── README.md
+```
+
+## 🔍 Verificação de Instalação
+
+### **1. Verificar Backend**
+```bash
+curl http://localhost:5000/api/health
+# Deve retornar: {"status":"ok"}
+```
+
+### **2. Verificar Banco de Dados**
+```bash
+cd backend
+npx prisma studio
+# Abre interface web para verificar tabelas
+```
+
+### **3. Verificar Scheduler**
+Nos logs do backend deve aparecer:
+```
+🚀 Iniciando scheduler de notificações...
+✅ Scheduler iniciado - verificando notificações a cada minuto
+```
+
+## 🛠️ Solução de Problemas
+
+### **Erro de Conexão com Banco**
+```bash
+# Verificar se PostgreSQL está rodando
+sudo systemctl status postgresql
+
+# Verificar conexão
+psql -h localhost -U usuario -d gerenciador_eventos
+```
+
+### **Erro de Permissões (Upload)**
+```bash
+# Para upload local
+chmod 755 backend/uploads
+
+# Para SMB
+# Verificar credenciais e conectividade
+```
+
+### **Erro de Porta em Uso**
+```bash
+# Verificar portas em uso
+netstat -tulpn | grep :5000
+netstat -tulpn | grep :3000
+
+# Matar processo se necessário
+kill -9 [PID]
+```
+
+## 📝 Notas Importantes
+
+### **Sistema de Notificações**
+- ✅ **Scheduler automático** - Funciona sem configuração
+- ✅ **Notificações em tempo real** - Aparecem no sino
+- ✅ **Lembretes de agendamentos** - X minutos antes
+- ✅ **Persistência no banco** - Notificações salvas
+
+### **Upload de Arquivos**
+- ✅ **Suporte SMB** - Para redes Windows
+- ✅ **Upload local** - Para servidores Linux
+- ✅ **Preview de arquivos** - Imagens, PDFs, textos
+- ✅ **Validação de tipos** - Segurança
+
+### **Segurança**
+- ✅ **JWT Authentication** - Tokens seguros
+- ✅ **Rate Limiting** - Proteção contra spam
+- ✅ **CORS configurado** - Acesso controlado
+- ✅ **Validação de dados** - Input sanitizado
+
+## 🔄 Atualizações
+
+### **Atualizar Dependências**
+```bash
+# Backend
+cd backend
+npm update
+
+# Frontend
+cd frontend
+npm update
+```
+
+### **Atualizar Banco de Dados**
+```bash
+cd backend
+npx prisma migrate dev
+npx prisma generate
+```
+
 ## 🚀 Funcionalidades
 
 ### 🏢 Sistema SaaS Multi-Empresa

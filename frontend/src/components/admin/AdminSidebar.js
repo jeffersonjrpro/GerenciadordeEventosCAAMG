@@ -1,6 +1,5 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const links = [
   { to: '/admin/dashboard', label: 'Estatísticas' },
@@ -14,7 +13,6 @@ const links = [
 
 export default function AdminSidebar() {
   const { pathname } = useLocation();
-  const { adminData } = useAdminAuth();
   return (
     <aside className="w-56 bg-white border-r h-screen p-4 flex flex-col">
       <div className="font-bold text-lg mb-8">Painel Master</div>

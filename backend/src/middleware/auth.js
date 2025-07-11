@@ -25,6 +25,7 @@ const authenticateToken = async (req, res, next) => {
         role: true,
         telefone: true,
         nomeEmpresa: true,
+        codigoEmpresa: true,
         nivel: true,
         ativo: true,
         empresaId: true,
@@ -72,11 +73,12 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Middleware para verificar se é organizador ou admin
+// Middleware para verificar se é organizador, admin ou checkin
 const requireOrganizer = (req, res, next) => {
-  if (req.user.role !== 'ORGANIZER' && req.user.role !== 'ADMIN') {
+  // Verificar se tem role ADMIN ou ORGANIZER, ou se tem nivel CHECKIN
+  if (req.user.role !== 'ORGANIZER' && req.user.role !== 'ADMIN' && req.user.nivel !== 'CHECKIN') {
     return res.status(403).json({ 
-      error: 'Acesso negado. Apenas organizadores ou administradores.' 
+      error: 'Acesso negado. Apenas organizadores, administradores ou checkin.' 
     });
   }
   next();
@@ -99,6 +101,7 @@ const optionalAuth = async (req, res, next) => {
           role: true,
           telefone: true,
           nomeEmpresa: true,
+          codigoEmpresa: true,
           nivel: true,
           ativo: true,
           empresaId: true,

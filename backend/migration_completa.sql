@@ -18,7 +18,19 @@ ADD COLUMN IF NOT EXISTS "dataArquivamento" TIMESTAMP;
 COMMENT ON COLUMN demandas.arquivada IS 'Indica se a demanda foi arquivada';
 COMMENT ON COLUMN demandas."dataArquivamento" IS 'Data e hora quando a demanda foi arquivada';
 
--- 2. CRIAR TABELA ARQUIVOS_DEMANDA
+-- 2. CORRIGIR CHAVE ESTRANGEIRA DAS OBSERVAÇÕES
+-- =====================================================
+
+-- Remover chave estrangeira antiga (se existir)
+ALTER TABLE observacoes 
+DROP CONSTRAINT IF EXISTS observacoes_autorId_fkey;
+
+-- Adicionar chave estrangeira correta para a tabela users
+ALTER TABLE observacoes 
+ADD CONSTRAINT observacoes_autorId_fkey 
+FOREIGN KEY ("autorId") REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- 3. CRIAR TABELA ARQUIVOS_DEMANDA
 -- =====================================================
 
 -- Criar tabela arquivos_demanda
@@ -53,7 +65,7 @@ COMMENT ON COLUMN arquivos_demanda."demandaId" IS 'ID da demanda à qual o arqui
 COMMENT ON COLUMN arquivos_demanda."uploadPorId" IS 'ID do usuário que fez o upload';
 COMMENT ON COLUMN arquivos_demanda."criadoEm" IS 'Data e hora do upload';
 
--- 3. VERIFICAR ESTRUTURAS CRIADAS
+-- 4. VERIFICAR ESTRUTURAS CRIADAS
 -- =====================================================
 
 -- Verificar se as colunas foram criadas na tabela demandas
@@ -73,7 +85,26 @@ FROM information_schema.columns
 WHERE table_name = 'arquivos_demanda'
 ORDER BY ordinal_position;
 
--- 4. VERIFICAR ÍNDICES
+-- Verificar chaves estrangeiras das observações
+SELECT 
+    tc.constraint_name, 
+    tc.table_name, 
+    kcu.column_name, 
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name 
+FROM 
+    information_schema.table_constraints AS tc 
+    JOIN information_schema.key_column_usage AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+    JOIN information_schema.constraint_column_usage AS ccu
+      ON ccu.constraint_name = tc.constraint_name
+      AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY' 
+    AND tc.table_name='observacoes' 
+    AND kcu.column_name = 'autorId';
+
+-- 5. VERIFICAR ÍNDICES
 -- =====================================================
 
 -- Verificar índices da tabela arquivos_demanda

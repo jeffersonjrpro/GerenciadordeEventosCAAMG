@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
+const empresaController = require('../controllers/admin/empresaController');
 
 // Retorna os dados da empresa pelo ID
 router.get('/empresas/:id', async (req, res) => {
@@ -14,5 +15,8 @@ router.get('/empresas/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar empresa' });
   }
 });
+
+// Rota para buscar empresa pelo código único
+router.get('/empresa-codigo/:codigo', empresaController.getByCodigo);
 
 module.exports = router; 

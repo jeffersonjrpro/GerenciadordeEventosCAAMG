@@ -25,7 +25,10 @@ export default function AgendamentoModal({
     categoria: 'Reunião',
     lembreteMinutosAntes: 30,
     visibilidade: 'PRIVADO',
+    notificarAutomaticamente: true,
   });
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (agendamento) {
@@ -37,6 +40,7 @@ export default function AgendamentoModal({
         categoria: agendamento.categoria || 'Reunião',
         lembreteMinutosAntes: agendamento.lembreteMinutosAntes || 30,
         visibilidade: agendamento.visibilidade || 'PRIVADO',
+        notificarAutomaticamente: agendamento.notificarAutomaticamente || true,
       });
     } else {
       setForm({
@@ -46,7 +50,8 @@ export default function AgendamentoModal({
         dataFim: '', 
         categoria: 'Reunião', 
         lembreteMinutosAntes: 30, 
-        visibilidade: 'PRIVADO'
+        visibilidade: 'PRIVADO',
+        notificarAutomaticamente: true,
       });
     }
   }, [agendamento, open]);
@@ -63,6 +68,19 @@ export default function AgendamentoModal({
       return;
     }
     onSave(form);
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete();
+    setShowDeleteConfirm(false);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   if (!open) return null;
@@ -165,6 +183,21 @@ export default function AgendamentoModal({
               <span>👥 Equipe</span>
             </label>
           </div>
+          
+          {/* Checkbox para notificação automática */}
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              name="notificarAutomaticamente" 
+              checked={form.notificarAutomaticamente} 
+              onChange={(e) => setForm(f => ({ ...f, notificarAutomaticamente: e.target.checked }))}
+              className="rounded"
+            />
+            <label className="text-gray-900 dark:text-white">
+              🔔 Notificar automaticamente
+            </label>
+          </div>
+          
           <div className="flex gap-2 mt-4">
             <button 
               type="submit" 
@@ -177,7 +210,7 @@ export default function AgendamentoModal({
                 <button 
                   type="button" 
                   className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors" 
-                  onClick={onDelete}
+                  onClick={handleDeleteClick}
                 >
                   Excluir
                 </button>
@@ -186,12 +219,75 @@ export default function AgendamentoModal({
                   className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors" 
                   onClick={onNotificar}
                 >
-                  🔔 Notificar
+                  🔔 Notificar Agora
                 </button>
               </>
             )}
+            {!modoEdicao && form.notificarAutomaticamente && (
+              <button 
+                type="button" 
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors" 
+                disabled
+              >
+                🔔 Notificação Automática
+              </button>
+            )}
           </div>
         </form>
+
+        {/* Popup de confirmação de exclusão */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6 transform transition-all">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Confirmar exclusão
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Esta ação não pode ser desfeita
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Você está prestes a excluir o agendamento:
+                </p>
+                <p className="font-medium text-gray-900 dark:text-white mt-1">
+                  "{form.titulo}"
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {form.dataInicio && form.dataFim && (
+                    `${dayjs(form.dataInicio).format('DD/MM/YYYY HH:mm')} - ${dayjs(form.dataFim).format('HH:mm')}`
+                  )}
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={handleCancelDelete}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

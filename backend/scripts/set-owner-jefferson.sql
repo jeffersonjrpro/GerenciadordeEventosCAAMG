@@ -1,0 +1,1 @@
+UPDATE "empresas" SET "ownerId" = 'cmcp99nf800029z701ehkl1bi' WHERE "id" = 'cmcp99nf000009z709rkjmsyq'; 

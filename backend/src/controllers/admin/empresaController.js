@@ -56,4 +56,17 @@ exports.delete = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Erro ao excluir empresa' });
   }
+};
+
+exports.getByCodigo = async (req, res) => {
+  try {
+    const { codigo } = req.params;
+    const empresa = await empresaService.getEmpresaByCodigo(codigo);
+    if (!empresa) {
+      return res.status(404).json({ error: 'Empresa não encontrada' });
+    }
+    res.json(empresa);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar empresa pelo código' });
+  }
 }; 

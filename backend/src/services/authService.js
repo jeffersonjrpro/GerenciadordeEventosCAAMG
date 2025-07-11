@@ -5,7 +5,7 @@ const prisma = require('../config/database');
 class AuthService {
   // Registrar novo usuário
   static async register(userData) {
-    const { email, name, password, telefone, nomeEmpresa } = userData;
+    const { email, name, password, telefone, nomeEmpresa, codigoEmpresa } = userData;
 
     // Verificar se email já existe
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -15,17 +15,35 @@ class AuthService {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Verificar se já existe empresa com esse nome
-    let empresa = await prisma.empresa.findFirst({ where: { nome: nomeEmpresa } });
-    if (!empresa) {
-      empresa = await prisma.empresa.create({
-        data: {
-          nome: nomeEmpresa,
-          emailContato: email,
-          telefone: telefone,
-          status: 'ATIVA',
-        }
-      });
+    let empresa = null;
+    let isOwner = false;
+
+    if (codigoEmpresa) {
+      // Buscar empresa pelo código
+      const empresaService = require('./admin/empresaService');
+      empresa = await prisma.empresa.findUnique({ where: { codigo: codigoEmpresa } });
+      if (!empresa) {
+        throw new Error('Código de empresa inválido ou não encontrado');
+      }
+    } else {
+      // Verificar se já existe empresa com esse nome
+      empresa = await prisma.empresa.findFirst({ where: { nome: nomeEmpresa } });
+      if (!empresa) {
+        // Gerar código único para a empresa
+        const empresaService = require('./admin/empresaService');
+        const codigo = Math.random().toString(36).substring(2, 10);
+        
+        empresa = await prisma.empresa.create({
+          data: {
+            nome: nomeEmpresa,
+            emailContato: email,
+            telefone: telefone,
+            status: 'ATIVA',
+            codigo: codigo
+          }
+        });
+        isOwner = true;
+      }
     }
 
     // Criar usuário vinculado à empresa
@@ -36,6 +54,7 @@ class AuthService {
         password: hashedPassword,
         telefone,
         nomeEmpresa,
+        codigoEmpresa: empresa.codigo, // Salva o código único da empresa
         role: 'ADMIN',
         nivel: 'ADMIN',
         empresaId: empresa.id,
@@ -47,6 +66,7 @@ class AuthService {
         name: true,
         telefone: true,
         nomeEmpresa: true,
+        codigoEmpresa: true,
         role: true,
         nivel: true,
         empresaId: true,
@@ -54,6 +74,14 @@ class AuthService {
         createdAt: true
       }
     });
+
+    // Se for o proprietário, definir o usuário como owner da empresa
+    if (isOwner) {
+      await prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { ownerId: user.id }
+      });
+    }
 
     // Gerar token JWT
     const token = this.generateToken(user.id);
@@ -81,11 +109,19 @@ class AuthService {
         empresaId: true,
         telefone: true,
         nomeEmpresa: true,
+        codigoEmpresa: true,
         trabalharTodosEventos: true,
         eventosIds: true,
         ativo: true,
         podeGerenciarDemandas: true,
-        createdAt: true
+        createdAt: true,
+        empresa: {
+          select: {
+            id: true,
+            nome: true,
+            ownerId: true
+          }
+        }
       }
     });
 
@@ -119,12 +155,14 @@ class AuthService {
       empresaId: user.empresaId,
       telefone: user.telefone,
       nomeEmpresa: user.nomeEmpresa,
+      codigoEmpresa: user.codigoEmpresa,
       trabalharTodosEventos: user.trabalharTodosEventos,
       eventosIds: user.eventosIds,
       ativo: user.ativo,
       podeGerenciarDemandas: user.podeGerenciarDemandas,
       createdAt: user.createdAt,
-      lastLoginAt: new Date()
+      lastLoginAt: new Date(),
+      empresa: user.empresa
     };
 
     return {
@@ -157,7 +195,7 @@ class AuthService {
     console.log('User ID:', userId);
     console.log('Update data:', updateData);
     
-    const { name, email, telefone, nomeEmpresa } = updateData;
+    const { name, email, telefone, nomeEmpresa, codigoEmpresa } = updateData;
 
     // Buscar usuário atual
     const currentUser = await prisma.user.findUnique({
@@ -168,6 +206,21 @@ class AuthService {
 
     if (!currentUser) {
       throw new Error('Usuário não encontrado');
+    }
+
+    // Se o usuário não tem empresa e informou um código, tentar vincular
+    if (!currentUser.empresaId && codigoEmpresa) {
+      // Buscar empresa pelo código usando o service existente
+      const empresaService = require('./admin/empresaService');
+      const empresa = await empresaService.getEmpresaByCodigo(codigoEmpresa);
+      if (!empresa) {
+        throw new Error('Código de empresa inválido ou não encontrado');
+      }
+      // Vincular usuário à empresa
+      await prisma.user.update({
+        where: { id: userId },
+        data: { empresaId: empresa.id },
+      });
     }
 
     // Preparar dados para atualização
@@ -203,7 +256,16 @@ class AuthService {
         nomeEmpresa: true,
         role: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        codigoEmpresa: true,
+        empresaId: true,
+        empresa: {
+          select: {
+            id: true,
+            nome: true,
+            ownerId: true
+          }
+        }
       }
     });
 
@@ -265,7 +327,16 @@ class AuthService {
         nomeEmpresa: true,
         role: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        codigoEmpresa: true, // Adicionado para exibir o código único da empresa
+        empresaId: true,
+        empresa: {
+          select: {
+            id: true,
+            nome: true,
+            ownerId: true
+          }
+        }
       }
     });
 

@@ -23,6 +23,7 @@ import FormBuilderPage from './pages/FormBuilderPage';
 import PublicPageEditorPage from './pages/PublicPageEditorPage';
 import InviteAccept from './pages/InviteAccept';
 import SubEventosPage from './pages/SubEventosPage';
+import Palestrantes from './pages/Palestrantes';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import Empresas from './pages/admin/Empresas';
@@ -100,6 +101,7 @@ function App() {
                 <Route path="events/:eventId/guests/:guestId/details" element={<GuestDetails />} />
                 <Route path="events/:eventId/checkin" element={<CheckIn />} />
                 <Route path="events/:eventId/subeventos" element={<SubEventosPage />} />
+                <Route path="events/:eventId/palestrantes" element={<Palestrantes />} />
                 <Route path="events/:eventId/form-builder" element={<FormBuilderPage />} />
                 <Route path="events/:eventId/page-editor" element={<PublicPageEditorPage />} />
                 <Route path="profile" element={<Profile />} />

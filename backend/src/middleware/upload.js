@@ -87,27 +87,8 @@ const handleUploadError = (error, req, res, next) => {
 };
 
 // Configuração para upload de arquivos de demandas
-const demandaStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = 'uploads/demandas';
-    console.log('📁 Upload demanda destination:', uploadDir);
-    
-    // Criar diretório se não existir
-    if (!fs.existsSync(uploadDir)) {
-      console.log('📁 Criando diretório:', uploadDir);
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    // Gerar nome único para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
-    console.log('📄 Nome do arquivo demanda gerado:', filename);
-    cb(null, filename);
-  }
-});
+// Usar memoryStorage para que o buffer fique disponível em req.file.buffer
+const demandaStorage = multer.memoryStorage();
 
 // Filtro para arquivos de demandas (aceita qualquer tipo)
 const demandaFileFilter = (req, file, cb) => {

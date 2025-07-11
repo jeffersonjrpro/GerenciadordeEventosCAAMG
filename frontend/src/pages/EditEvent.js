@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import api from '../services/api';
-import { Calendar, MapPin, Clock, FileText, Save, ArrowLeft } from 'lucide-react';
+import { Calendar, MapPin, FileText, Save, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -14,6 +14,12 @@ const EditEvent = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [event, setEvent] = useState(null);
   const [quillError, setQuillError] = useState(false);
+  
+  // Estados para popups
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const {
     register,
@@ -24,13 +30,7 @@ const EditEvent = () => {
     control
   } = useForm();
 
-  const isActive = watch('isActive');
-
-  useEffect(() => {
-    fetchEventDetails();
-  }, [eventId]);
-
-  const fetchEventDetails = async () => {
+  const fetchEventDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/events/${eventId}`);
@@ -61,12 +61,19 @@ const EditEvent = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, navigate, reset]);
+
+  useEffect(() => {
+    fetchEventDetails();
+  }, [fetchEventDetails]);
 
   const onSubmit = async (data) => {
     setSaving(true);
     try {
       const formData = new FormData();
+      
+      console.log('🔍 onSubmit - data recebido:', data);
+      console.log('🔍 onSubmit - customSlug:', data.customSlug);
       
       // Adiciona os campos do formulário
       Object.keys(data).forEach(key => {
@@ -80,10 +87,10 @@ const EditEvent = () => {
             // Evita que descrições vazias (<p><br></p>) sejam salvas como nulas
             formData.append('description', data[key] === '<p><br></p>' ? '' : data[key]);
           } else if (key === 'customSlug') {
-            // Adiciona customSlug se não estiver vazio
-            if (data[key].trim()) {
-              formData.append('customSlug', data[key].trim());
-            }
+            // Sempre enviar customSlug, mesmo se vazio, para permitir limpeza
+            const customSlugValue = data[key] || '';
+            console.log('🔍 onSubmit - enviando customSlug:', customSlugValue);
+            formData.append('customSlug', customSlugValue);
           } else if (key !== 'image') { // Não adiciona o campo image aqui
             formData.append(key, data[key]);
           }
@@ -106,10 +113,10 @@ const EditEvent = () => {
       await fetchEventDetails();
       
       // Mostrar mensagem de sucesso
-      alert('Evento atualizado com sucesso!');
+      showSuccessMessage('Evento atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar evento:', error);
-      alert('Erro ao atualizar evento. Tente novamente.');
+      showErrorMessage('Erro ao atualizar evento. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -145,6 +152,24 @@ const EditEvent = () => {
     'list', 'bullet', 'indent',
     'link', 'image'
   ];
+
+  // Função para mostrar popup de sucesso
+  const showSuccessMessage = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessPopup(true);
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 3000);
+  };
+
+  // Função para mostrar popup de erro
+  const showErrorMessage = (message) => {
+    setErrorMessage(message);
+    setShowErrorPopup(true);
+    setTimeout(() => {
+      setShowErrorPopup(false);
+    }, 4000);
+  };
 
   if (loading) {
     return (
@@ -494,6 +519,46 @@ const EditEvent = () => {
           </div>
         </div>
       </form>
+
+      {/* Popup de Sucesso */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowSuccessPopup(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Sucesso!
+              </h3>
+              <p className="text-sm text-gray-600">
+                {successMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup de Erro */}
+      {showErrorPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowErrorPopup(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Erro!
+              </h3>
+              <p className="text-sm text-gray-600">
+                {errorMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

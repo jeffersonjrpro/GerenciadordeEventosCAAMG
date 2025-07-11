@@ -65,7 +65,7 @@ class UserService {
           nivel,
           ativo: true,
           empresaId,
-          eventosIds: eventosIds || [],
+          eventosIds: Array.isArray(eventosIds) ? eventosIds : [],
           trabalharTodosEventos: trabalharTodosEventos || false
         },
         select: {
@@ -134,7 +134,7 @@ class UserService {
           email,
           telefone,
           nivel,
-          eventosIds: eventosIds || [],
+          eventosIds: Array.isArray(eventosIds) ? eventosIds : [],
           trabalharTodosEventos: trabalharTodosEventos || false,
           nomeEmpresa,
           ...(role && { role })

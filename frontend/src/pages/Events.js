@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import api from '../services/api';
@@ -12,7 +12,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  MoreVertical
+  AlertTriangle,
+  User
 } from 'lucide-react';
 
 const Events = () => {
@@ -31,6 +32,10 @@ const Events = () => {
     futuros: 0 
   });
 
+  // Estados para modal de erro de permissão
+  const [showPermissionErrorModal, setShowPermissionErrorModal] = useState(false);
+  const [permissionError, setPermissionError] = useState(null);
+
   const {
     register,
     handleSubmit,
@@ -42,26 +47,24 @@ const Events = () => {
   const searchTerm = watch('search');
   const statusFilter = watch('status');
 
-  useEffect(() => {
-    fetchEvents();
-    carregarEstatisticas();
-  }, []);
-
-  const carregarEstatisticas = async () => {
+  const carregarEstatisticas = useCallback(async () => {
     try {
       // Usar a mesma API que funciona no dashboard
       const response = await api.get('/events/stats');
       const stats = response.data.data;
       
       // Converter para o formato esperado pelos cards
-      setEstatisticas({
+      const estatisticasAtualizadas = {
         total: stats.totalEvents || 0,
         ativos: stats.eventosAtivos || 0,
         emAndamento: stats.eventosEmAndamento || 0,
         concluidos: stats.eventosConcluidos || 0
-      });
+      };
+      
+      setEstatisticas(estatisticasAtualizadas);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error('❌ Erro ao carregar estatísticas:', error);
+      console.error('❌ Detalhes do erro:', error.response?.data);
       // Fallback para valores zero
       setEstatisticas({
         total: 0,
@@ -70,19 +73,9 @@ const Events = () => {
         concluidos: 0
       });
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (searchTerm || statusFilter) {
-      const delayDebounceFn = setTimeout(() => {
-        fetchEvents();
-      }, 500);
-
-      return () => clearTimeout(delayDebounceFn);
-    }
-  }, [searchTerm, statusFilter]);
-
-  const fetchEvents = async (page = 1) => {
+  const fetchEvents = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -92,15 +85,55 @@ const Events = () => {
         ...(statusFilter && statusFilter !== 'all' && { status: statusFilter }),
       });
 
-      const response = await api.get(`/events/my-events?${params}`);
-      setEvents(response.data.data);
-      setPagination(response.data.pagination);
+      console.log('🔍 fetchEvents - URL completa:', `/events/meus-eventos?${params}`);
+      console.log('🔍 fetchEvents - Parâmetros:', Object.fromEntries(params));
+      
+      const response = await api.get(`/events/meus-eventos?${params}`);
+      
+      console.log('🔍 fetchEvents - Status da resposta:', response.status);
+      console.log('🔍 fetchEvents - Headers da resposta:', response.headers);
+      console.log('🔍 fetchEvents - Dados completos da resposta:', response.data);
+      console.log('🔍 fetchEvents - Tipo de response.data:', typeof response.data);
+      console.log('🔍 fetchEvents - response.data.data existe?', !!response.data.data);
+      console.log('🔍 fetchEvents - response.data.data é array?', Array.isArray(response.data.data));
+      console.log('🔍 fetchEvents - Quantidade de eventos:', response.data.data?.length || 0);
+      
+      if (response.data.data && response.data.data.length > 0) {
+        console.log('🔍 fetchEvents - Primeiro evento:', response.data.data[0]);
+        console.log('🔍 fetchEvents - Todos os eventos:');
+        response.data.data.forEach((event, index) => {
+          console.log(`   ${index + 1}. ${event.name} (ID: ${event.id})`);
+        });
+      }
+      
+      setEvents(response.data.data || []);
+      setPagination(response.data.pagination || {});
     } catch (error) {
-      console.error('Erro ao carregar eventos:', error);
+      console.error('❌ Erro ao carregar eventos:', error);
+      console.error('❌ Detalhes do erro:', error.response?.data);
+      console.error('❌ Status do erro:', error.response?.status);
+      console.error('❌ Erro completo:', error);
+      setEvents([]);
+      setPagination({});
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    fetchEvents();
+    carregarEstatisticas();
+  }, [fetchEvents, carregarEstatisticas]);
+
+  useEffect(() => {
+    if (searchTerm || statusFilter) {
+      const delayDebounceFn = setTimeout(() => {
+        fetchEvents();
+      }, 500);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [searchTerm, statusFilter, fetchEvents]);
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return;
@@ -113,28 +146,53 @@ const Events = () => {
       carregarEstatisticas(); // Recarregar estatísticas após deletar
     } catch (error) {
       console.error('Erro ao deletar evento:', error);
+      
+      // Verificar se é erro de permissão
+      if (error.response && error.response.status === 403) {
+        const errorData = error.response.data;
+        setPermissionError({
+          eventName: errorData.eventName || selectedEvent.name,
+          eventOwner: errorData.eventOwner,
+          message: errorData.message || 'Apenas o criador do evento pode excluí-lo'
+        });
+        setShowPermissionErrorModal(true);
+        setShowDeleteModal(false);
+      } else {
+        // Outros erros
+        alert('Erro ao deletar evento. Tente novamente.');
+      }
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    // Converter para fuso horário de Brasília
+    const date = new Date(dateString);
+    const brasiliaTime = new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    }).format(date);
+    
+    return brasiliaTime;
   };
 
   const getEventStatus = (event) => {
+    // Usar fuso horário de Brasília
     const now = new Date();
     const eventDate = new Date(event.date);
     
+    // Converter para fuso horário de Brasília
+    const brasiliaNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    const brasiliaEventDate = new Date(eventDate.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    
     if (!event.isActive) {
       return { status: 'inactive', label: 'Inativo', color: 'text-gray-500', bgColor: 'bg-gray-100' };
-    } else if (eventDate < now) {
+    } else if (brasiliaEventDate < brasiliaNow) {
       return { status: 'finished', label: 'Finalizado', color: 'text-gray-600', bgColor: 'bg-gray-100' };
-    } else if (eventDate.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
+    } else if (brasiliaEventDate.getTime() - brasiliaNow.getTime() < 24 * 60 * 60 * 1000) {
       return { status: 'today', label: 'Hoje', color: 'text-warning-700', bgColor: 'bg-warning-100' };
     } else {
       return { status: 'upcoming', label: 'Próximo', color: 'text-success-700', bgColor: 'bg-success-100' };
@@ -426,6 +484,64 @@ const Events = () => {
                 >
                   Deletar
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Erro de Permissão */}
+      {showPermissionErrorModal && permissionError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-6 w-full max-w-md">
+            <div className="relative bg-white rounded-lg shadow-xl">
+              {/* Header */}
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-yellow-100 rounded-full mb-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-600" />
+              </div>
+              
+              {/* Content */}
+              <div className="text-center px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Permissão Negada
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Você não tem permissão para excluir o evento <strong>"{permissionError.eventName}"</strong>.
+                </p>
+                
+                {permissionError.eventOwner && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <p className="text-xs text-gray-500 mb-2">Apenas o criador do evento pode excluí-lo:</p>
+                    <div className="flex items-center justify-center space-x-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {permissionError.eventOwner.name}
+                      </span>
+                    </div>
+                    {permissionError.eventOwner.email && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {permissionError.eventOwner.email}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mb-6">
+                  Entre em contato com o criador do evento se precisar que ele seja excluído.
+                </p>
+                
+                {/* Actions */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setShowPermissionErrorModal(false);
+                      setPermissionError(null);
+                    }}
+                    className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                  >
+                    Entendi
+                  </button>
+                </div>
               </div>
             </div>
           </div>

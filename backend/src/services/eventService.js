@@ -43,7 +43,7 @@ class EventService {
 
   // Criar novo evento
   static async createEvent(userId, eventData) {
-    const { name, description, date, location, maxGuests, customFields, companyId, customSlug } = eventData;
+    const { name, description, date, location, maxGuests, customFields, customSlug } = eventData;
 
     // Buscar o usuário para pegar o empresaId
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -69,9 +69,8 @@ class EventService {
         customFields: customFields || {},
         customSlug: finalSlug,
         isPublic: true,
-        userId,
-        companyId,
-        empresaId: user.empresaId // Vincula o evento à empresa do usuário
+        userId, // sempre o usuário logado
+        empresaId: user.empresaId // sempre a empresa do usuário logado
       },
       include: {
         user: {
@@ -104,40 +103,77 @@ class EventService {
     // Adicionar o criador como organizador OWNER
     await OrganizerService.addOrganizer(event.id, userId, 'OWNER');
 
+    // Adicionar o ADMIN da empresa como OWNER, se não for o próprio usuário
+    const admin = await prisma.user.findFirst({ where: { empresaId: user.empresaId, role: 'ADMIN' } });
+    if (admin && admin.id !== userId) {
+      await OrganizerService.addOrganizer(event.id, admin.id, 'OWNER');
+    }
+
     return event;
   }
 
   // Buscar evento por ID
   static async getEventById(eventId, userId = null) {
-    const where = { id: eventId };
+    console.log('🔍 getEventById - Iniciando com eventId:', eventId, 'userId:', userId);
     
     // Se userId fornecido, verificar se o usuário tem acesso ao evento
     if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (user.role === 'ORGANIZER') {
-        if (user.trabalharTodosEventos) {
-          // Permite se o evento for da mesma empresa
-          const event = await prisma.event.findFirst({ where: { id: eventId, empresaId: user.empresaId } });
-          if (!event) throw new Error('Sem permissão para acessar este evento');
-        } else if (user.eventosIds && user.eventosIds.includes(eventId)) {
-          // Permite se o evento está na lista de eventosIds
-          // ok
-        } else {
+      console.log('🔍 getEventById - Usuário encontrado:', {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        nivel: user.nivel,
+        empresaId: user.empresaId
+      });
+      
+      // Todos os usuários (ADMIN, ORGANIZER, CHECKIN) podem ver todos os eventos da empresa
+      if (user.empresaId) {
+        // Verificar se o evento pertence à empresa do usuário
+        const event = await prisma.event.findFirst({ 
+          where: { 
+            id: eventId, 
+            empresaId: user.empresaId 
+          } 
+        });
+        if (!event) {
+          console.log('❌ getEventById - Evento não encontrado ou não pertence à empresa');
           throw new Error('Sem permissão para acessar este evento');
         }
+        console.log('✅ getEventById - Evento encontrado e usuário tem permissão');
       } else {
-        // Checagem padrão: criador ou organizador relacional
-        const isCreator = await prisma.event.findFirst({ where: { id: eventId, userId } });
-        const isOrganizer = await OrganizerService.isUserOrganizer(eventId, userId);
-        if (!isCreator && !isOrganizer) {
+        // Se não tem empresaId, verificar se é criador do evento
+        const event = await prisma.event.findFirst({ 
+          where: { 
+            id: eventId, 
+            userId 
+          } 
+        });
+        if (!event) {
+          console.log('❌ getEventById - Evento não encontrado ou usuário não é criador');
           throw new Error('Sem permissão para acessar este evento');
         }
+        console.log('✅ getEventById - Evento encontrado e usuário é criador');
       }
     }
 
+    console.log('🔍 getEventById - Buscando evento completo...');
     const event = await prisma.event.findFirst({
       where: { id: eventId },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        date: true,
+        location: true,
+        maxGuests: true,
+        isActive: true,
+        isPublic: true,
+        customFields: true,
+        imageUrl: true,
+        customSlug: true,
+        userId: true,
+        empresaId: true,
         user: {
           select: {
             id: true,
@@ -188,9 +224,11 @@ class EventService {
     });
 
     if (!event) {
+      console.log('❌ getEventById - Evento não encontrado');
       throw new Error('Evento não encontrado');
     }
 
+    console.log('✅ getEventById - Evento retornado com sucesso:', event.name);
     return event;
   }
 
@@ -199,43 +237,35 @@ class EventService {
     const { page = 1, limit = 10, search = '', status = 'all' } = filters;
     const skip = (page - 1) * limit;
 
-    // Buscar usuário para saber permissões
+    // Buscar usuário para pegar o empresaId
     const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    // Todos os usuários da mesma empresa podem ver todos os eventos da empresa
     let where = {};
 
-    if (user.role === 'ORGANIZER') {
-      if (user.trabalharTodosEventos) {
-        // ORGANIZER pode ver todos os eventos da empresa
+    if (user.empresaId) {
         where.empresaId = user.empresaId;
-      } else if (user.eventosIds && user.eventosIds.length > 0) {
-        where.id = { in: user.eventosIds };
       } else {
-        // Não retorna nenhum evento
-        where.id = -1;
-      }
-    } else {
-      // Admin ou criador: eventos criados ou onde é organizador
-      where = {
-        OR: [
-          { userId }, // Eventos criados pelo usuário
-          { organizers: { some: { userId } } } // Eventos onde é organizador
-        ]
-      };
+      where.userId = userId;
     }
 
     // Filtros adicionais
     if (search) {
-      where = {
-        ...where,
+      const searchCondition = {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
           { location: { contains: search, mode: 'insensitive' } }
         ]
       };
+      where = { ...where, ...searchCondition };
     }
-    if (status === 'active') where.isActive = true;
-    if (status === 'inactive') where.isActive = false;
+    if (status === 'active') {
+      where.isActive = true;
+    }
+    if (status === 'inactive') {
+      where.isActive = false;
+    }
 
     const [events, total] = await Promise.all([
       prisma.event.findMany({
@@ -415,16 +445,38 @@ class EventService {
     console.log('EventService.updateEvent - userId:', userId);
     console.log('EventService.updateEvent - updateData:', updateData);
     
-    // Verificar se o evento existe e pertence ao usuário
-    const existingEvent = await prisma.event.findFirst({
+    // Buscar usuário para verificar permissões
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    console.log('EventService.updateEvent - Usuário:', {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      nivel: user.nivel,
+      empresaId: user.empresaId
+    });
+    
+    // Verificar se o evento existe e usuário tem permissão
+    let existingEvent;
+    if (user.empresaId) {
+      // Todos os usuários da empresa podem editar eventos da empresa
+      existingEvent = await prisma.event.findFirst({
+        where: {
+          id: eventId,
+          empresaId: user.empresaId
+        }
+      });
+    } else {
+      // Se não tem empresaId, verificar se é criador do evento
+      existingEvent = await prisma.event.findFirst({
       where: {
         id: eventId,
         userId
       }
     });
+    }
 
     if (!existingEvent) {
-      console.log('EventService.updateEvent - Evento não encontrado');
+      console.log('EventService.updateEvent - Evento não encontrado ou sem permissão');
       throw new Error('Evento não encontrado');
     }
 
@@ -438,12 +490,34 @@ class EventService {
 
     // Validar customSlug se foi fornecido
     let finalSlug = existingEvent.customSlug;
-    if (customSlug !== undefined && customSlug !== existingEvent.customSlug) {
-      if (customSlug && !(await this.isSlugAvailable(customSlug, eventId))) {
+    console.log('🔍 updateEvent - customSlug recebido:', customSlug);
+    console.log('🔍 updateEvent - existingEvent.customSlug:', existingEvent.customSlug);
+    
+    if (customSlug !== undefined) {
+      // Se customSlug foi enviado (mesmo que vazio), processar
+      if (customSlug && customSlug.trim()) {
+        // Se tem valor, verificar se está disponível
+        console.log('🔍 updateEvent - customSlug tem valor, verificando disponibilidade');
+        if (!(await this.isSlugAvailable(customSlug.trim(), eventId))) {
         throw new Error('URL personalizada já está em uso');
       }
-      finalSlug = customSlug || null;
+        finalSlug = customSlug.trim();
+        console.log('🔍 updateEvent - finalSlug definido como:', finalSlug);
+      } else {
+        // Se está vazio, gerar slug automático baseado no nome
+        console.log('🔍 updateEvent - customSlug vazio, gerando slug automático');
+        if (name) {
+          finalSlug = await this.generateUniqueSlug(name, eventId);
+          console.log('🔍 updateEvent - slug automático gerado:', finalSlug);
+        } else {
+          // Se não tem nome, manter o slug atual
+          finalSlug = existingEvent.customSlug;
+          console.log('🔍 updateEvent - mantendo slug atual:', finalSlug);
+        }
+      }
     }
+    
+    console.log('🔍 updateEvent - finalSlug final:', finalSlug);
 
     const event = await prisma.event.update({
       where: { id: eventId },
@@ -482,8 +556,37 @@ class EventService {
 
   // Deletar evento
   static async deleteEvent(eventId, userId) {
-    // Verificar se o evento existe e pertence ao usuário
-    const existingEvent = await prisma.event.findFirst({
+    console.log('EventService.deleteEvent - Iniciando exclusão');
+    console.log('EventService.deleteEvent - eventId:', eventId);
+    console.log('EventService.deleteEvent - userId:', userId);
+    
+    // Buscar usuário para verificar permissões
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    console.log('EventService.deleteEvent - Usuário:', {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      nivel: user.nivel,
+      empresaId: user.empresaId
+    });
+    
+    // Verificar se o evento existe e usuário tem permissão
+    let existingEvent;
+    if (user.empresaId) {
+      // Todos os usuários da empresa podem deletar eventos da empresa
+      existingEvent = await prisma.event.findFirst({
+        where: {
+          id: eventId,
+          empresaId: user.empresaId
+        },
+        include: {
+          guests: true,
+          checkIns: true
+        }
+      });
+    } else {
+      // Se não tem empresaId, verificar se é criador do evento
+      existingEvent = await prisma.event.findFirst({
       where: {
         id: eventId,
         userId
@@ -493,16 +596,21 @@ class EventService {
         checkIns: true
       }
     });
+    }
 
     if (!existingEvent) {
+      console.log('EventService.deleteEvent - Evento não encontrado ou sem permissão');
       throw new Error('Evento não encontrado');
     }
+
+    console.log('EventService.deleteEvent - Evento encontrado, deletando...');
 
     // Deletar evento (cascade irá deletar convidados e check-ins)
     await prisma.event.delete({
       where: { id: eventId }
     });
 
+    console.log('EventService.deleteEvent - Evento deletado com sucesso');
     return { message: 'Evento deletado com sucesso' };
   }
 
@@ -537,34 +645,45 @@ class EventService {
 
   // Obter estatísticas gerais do usuário
   static async getUserStats(userId) {
+    // Buscar usuário para pegar o empresaId
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    let where = {};
+
+    // Todos os usuários da mesma empresa podem ver todos os eventos da empresa
+    if (user.empresaId) {
+      where.empresaId = user.empresaId;
+    } else {
+      where.userId = userId;
+    }
+
     const now = new Date();
     
     const [events, totalGuests, totalConfirmed, totalCheckedIn, eventosAtivos, eventosEmAndamento, eventosConcluidos] = await Promise.all([
-      prisma.event.count({ where: { userId } }),
+      prisma.event.count({ where }),
       prisma.guest.count({
         where: {
-          event: { userId }
+          event: where
         }
       }),
       prisma.guest.count({
         where: {
-          event: { userId },
+          event: where,
           confirmed: true
         }
       }),
       prisma.checkIn.count({
         where: {
-          event: { userId }
+          event: where
         }
       }),
       // Eventos ativos
       prisma.event.count({ 
-        where: { userId, isActive: true } 
+        where: { ...where, isActive: true } 
       }),
       // Eventos em andamento (hoje)
       prisma.event.count({ 
         where: { 
-          userId, 
+          ...where, 
           isActive: true,
           date: {
             gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
@@ -575,7 +694,7 @@ class EventService {
       // Eventos concluídos (data passou e ativos)
       prisma.event.count({ 
         where: { 
-          userId, 
+          ...where, 
           isActive: true,
           date: { lt: now }
         } 
@@ -602,17 +721,11 @@ class EventService {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       let where = {};
 
-      if (user.role === 'ORGANIZER') {
-        if (user.trabalharTodosEventos) {
-          where.empresaId = empresaId;
-        } else if (user.eventosIds && user.eventosIds.length > 0) {
-          where.id = { in: user.eventosIds };
+      // Todos os usuários da mesma empresa podem ver todos os eventos da empresa
+      if (user.empresaId) {
+        where.empresaId = user.empresaId;
         } else {
-          where.id = -1; // Não retorna nenhum evento
-        }
-      } else {
-        // Admin ou criador: eventos da empresa ou criados pelo usuário
-        where = empresaId ? { empresaId } : { userId };
+        where.userId = userId;
       }
 
       const now = new Date();
@@ -1192,7 +1305,20 @@ class EventService {
         date: true,
         location: true,
         imageUrl: true,
-        publicPageConfig: true
+        publicPageConfig: true,
+        palestrantes: {
+          where: { ativo: true },
+          orderBy: { ordem: 'asc' },
+          select: {
+            id: true,
+            nome: true,
+            cargo: true,
+            descricao: true,
+            imagem: true,
+            ordem: true,
+            ativo: true
+          }
+        }
       }
     });
 
@@ -1200,23 +1326,16 @@ class EventService {
       throw new Error('Evento não encontrado');
     }
 
-    console.log('✅ getPublicPageConfigForPreview - evento encontrado:', {
-      id: event.id,
-      name: event.name,
-      imageUrl: event.imageUrl,
-      hasPublicPageConfig: !!event.publicPageConfig
-    });
-
     // Se não tem configuração, criar uma padrão
     if (!event.publicPageConfig) {
-      console.log('📝 getPublicPageConfigForPreview - criando configuração padrão');
       const defaultConfig = {
-        layout: 'modern',
+        tema: 'modern',
         theme: {
           primaryColor: '#3B82F6',
           secondaryColor: '#1E40AF',
           backgroundColor: '#FFFFFF',
-          textColor: '#1F2937'
+          textColor: '#1F2937',
+          buttonColor: '#3B82F6'
         },
         header: {
           title: event.name,
@@ -1235,19 +1354,32 @@ class EventService {
           showForm: true,
           buttonText: 'Inscrever-se',
           formTitle: 'Faça sua inscrição',
-          formDescription: 'Preencha os dados abaixo para participar do evento'
+          formDescription: 'Preencha os dados abaixo para participar do evento',
+          cardTitle: 'Ingressos'
         },
         footer: {
           showSocialLinks: false,
           customText: '© 2024 Sistema de Eventos'
-        }
+        },
+        palestrantes: event.palestrantes || []
       };
 
-      console.log('✅ getPublicPageConfigForPreview - configuração padrão criada:', defaultConfig);
       return defaultConfig;
     }
 
     console.log('✅ getPublicPageConfigForPreview - retornando configuração existente:', event.publicPageConfig);
+    
+    // Garantir que palestrantes seja sempre um array
+    if (event.publicPageConfig.palestrantes && !Array.isArray(event.publicPageConfig.palestrantes)) {
+      console.log('🔍 getPublicPageConfigForPreview - convertendo palestrantes de objeto para array');
+      // Se palestrantes é um objeto, converter para array
+      const palestrantesArray = Object.values(event.publicPageConfig.palestrantes);
+      event.publicPageConfig.palestrantes = palestrantesArray;
+    }
+    
+    // Sempre carregar palestrantes do banco de dados para garantir que estão atualizados
+    event.publicPageConfig.palestrantes = event.palestrantes || [];
+    
     return event.publicPageConfig;
   }
 
@@ -1329,6 +1461,10 @@ class EventService {
 
   // Obter configuração da página pública
   static async getPublicPageConfig(eventId, userId) {
+    console.log('🔍 getPublicPageConfig - Iniciando busca');
+    console.log('🔍 getPublicPageConfig - eventId:', eventId);
+    console.log('🔍 getPublicPageConfig - userId:', userId);
+    
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
@@ -1341,23 +1477,43 @@ class EventService {
         date: true,
         location: true,
         imageUrl: true,
-        publicPageConfig: true
+        publicPageConfig: true,
+        palestrantes: {
+          where: { ativo: true },
+          orderBy: { ordem: 'asc' },
+          select: {
+            id: true,
+            nome: true,
+            cargo: true,
+            descricao: true,
+            imagem: true,
+            ordem: true,
+            ativo: true
+          }
+        }
       }
     });
 
     if (!event) {
+      console.log('❌ getPublicPageConfig - evento não encontrado');
       throw new Error('Evento não encontrado');
     }
 
+    console.log('✅ getPublicPageConfig - evento encontrado');
+    console.log('🔍 getPublicPageConfig - event.publicPageConfig existe?', !!event.publicPageConfig);
+    console.log('🔍 getPublicPageConfig - palestrantes encontrados:', event.palestrantes?.length || 0);
+
     // Se não tem configuração, criar uma padrão
     if (!event.publicPageConfig) {
+      console.log('🔍 getPublicPageConfig - criando configuração padrão');
       const defaultConfig = {
-        layout: 'modern',
+        tema: 'modern',
         theme: {
           primaryColor: '#3B82F6',
           secondaryColor: '#1E40AF',
           backgroundColor: '#FFFFFF',
-          textColor: '#1F2937'
+          textColor: '#1F2937',
+          buttonColor: '#3B82F6'
         },
         header: {
           title: event.name,
@@ -1381,8 +1537,12 @@ class EventService {
         footer: {
           showSocialLinks: false,
           customText: '© 2024 Sistema de Eventos'
-        }
+        },
+        palestrantes: event.palestrantes || []
       };
+
+      console.log('🔍 getPublicPageConfig - defaultConfig.tema:', defaultConfig.tema);
+      console.log('🔍 getPublicPageConfig - palestrantes incluídos:', event.palestrantes?.length || 0);
 
       // Salvar configuração padrão
       await prisma.event.update({
@@ -1390,14 +1550,35 @@ class EventService {
         data: { publicPageConfig: defaultConfig }
       });
 
+      console.log('✅ getPublicPageConfig - configuração padrão salva');
       return defaultConfig;
     }
+
+    console.log('✅ getPublicPageConfig - retornando configuração existente');
+    console.log('🔍 getPublicPageConfig - event.publicPageConfig.tema:', event.publicPageConfig.tema);
+    
+    // Garantir que palestrantes seja sempre um array
+    if (event.publicPageConfig.palestrantes && !Array.isArray(event.publicPageConfig.palestrantes)) {
+      console.log('🔍 getPublicPageConfig - convertendo palestrantes de objeto para array');
+      // Se palestrantes é um objeto, converter para array
+      const palestrantesArray = Object.values(event.publicPageConfig.palestrantes);
+      event.publicPageConfig.palestrantes = palestrantesArray;
+    }
+    
+    // Sempre carregar palestrantes do banco de dados para garantir que estão atualizados
+    event.publicPageConfig.palestrantes = event.palestrantes || [];
 
     return event.publicPageConfig;
   }
 
   // Atualizar configuração da página pública
   static async updatePublicPageConfig(eventId, userId, config) {
+    console.log('🔍 updatePublicPageConfig - Iniciando atualização');
+    console.log('🔍 updatePublicPageConfig - eventId:', eventId);
+    console.log('🔍 updatePublicPageConfig - userId:', userId);
+    console.log('🔍 updatePublicPageConfig - config.layout:', config.layout);
+    console.log('🔍 updatePublicPageConfig - config completo:', JSON.stringify(config, null, 2));
+    
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
@@ -1406,13 +1587,27 @@ class EventService {
     });
 
     if (!event) {
+      console.log('❌ updatePublicPageConfig - evento não encontrado');
       throw new Error('Evento não encontrado');
+    }
+
+    console.log('✅ updatePublicPageConfig - evento encontrado, fazendo update');
+
+    // Garantir que palestrantes seja sempre um array
+    if (config.palestrantes && !Array.isArray(config.palestrantes)) {
+      console.log('🔍 updatePublicPageConfig - convertendo palestrantes de objeto para array');
+      // Se palestrantes é um objeto, converter para array
+      const palestrantesArray = Object.values(config.palestrantes);
+      config.palestrantes = palestrantesArray;
     }
 
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
       data: { publicPageConfig: config }
     });
+
+    console.log('✅ updatePublicPageConfig - evento atualizado');
+    console.log('✅ updatePublicPageConfig - publicPageConfig salvo:', JSON.stringify(updatedEvent.publicPageConfig, null, 2));
 
     return updatedEvent.publicPageConfig;
   }

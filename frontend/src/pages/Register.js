@@ -1,29 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building } from 'lucide-react';
 import logo from '../assets/logo-preta.png';
+import axios from 'axios';
 
 const Register = () => {
   const { register: registerUser } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [nomeEmpresaBloqueado, setNomeEmpresaBloqueado] = useState(false);
+  const [nomeEmpresa, setNomeEmpresa] = useState('');
+  const [codigoEmpresaError, setCodigoEmpresaError] = useState('');
 
   const {
     register,
     handleSubmit,
     watch,
+    setError,
     formState: { errors },
   } = useForm();
 
   const password = watch('password');
 
+  // Atualiza nomeEmpresa do formulário ao digitar
+  const handleNomeEmpresaChange = (e) => {
+    setNomeEmpresa(e.target.value);
+  };
+
+  // Busca nome da empresa ao digitar o código
+  const handleCodigoEmpresaChange = async (e) => {
+    const value = e.target.value;
+    setCodigoEmpresaError('');
+    if (!value) {
+      setNomeEmpresa('');
+      setNomeEmpresaBloqueado(false);
+      return;
+    }
+    try {
+      const res = await axios.get(`/api/empresa-codigo/${value}`);
+      if (res.data && res.data.nome) {
+        setNomeEmpresa(res.data.nome);
+        setNomeEmpresaBloqueado(true);
+      } else {
+        setNomeEmpresa('');
+        setNomeEmpresaBloqueado(false);
+        setCodigoEmpresaError('Código de empresa inválido ou não encontrado');
+      }
+    } catch {
+      setNomeEmpresa('');
+      setNomeEmpresaBloqueado(false);
+      setCodigoEmpresaError('Código de empresa inválido ou não encontrado');
+    }
+  };
+
+  // Se o usuário digitar manualmente no campo de código, desbloqueia o nome se apagar
+  useEffect(() => {
+    if (!watch('codigoEmpresa')) {
+      setNomeEmpresaBloqueado(false);
+    }
+  }, [watch('codigoEmpresa')]);
+
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await registerUser({ ...data, nivel: 'ADMIN' });
+      // Incluir o campo codigoEmpresa no data enviado
+      const formData = {
+        ...data,
+        codigoEmpresa: data.codigoEmpresa || undefined,
+        nivel: 'ADMIN'
+      };
+      const result = await registerUser(formData);
+      if (result && result.error && result.error.includes('Email já cadastrado')) {
+        setError('email', { type: 'manual', message: 'Email já cadastrado' });
+      }
     } catch (error) {
       console.error('Erro no registro:', error);
     } finally {
@@ -155,12 +207,32 @@ const Register = () => {
                       value: 2,
                       message: 'Nome da empresa deve ter pelo menos 2 caracteres',
                     },
+                    onChange: (e) => {
+                      if (!nomeEmpresaBloqueado) setNomeEmpresa(e.target.value);
+                    }
                   })}
+                  value={nomeEmpresaBloqueado ? nomeEmpresa : undefined}
+                  disabled={nomeEmpresaBloqueado}
                 />
               </div>
               {errors.nomeEmpresa && (
                 <p className="form-error">{errors.nomeEmpresa.message}</p>
               )}
+            </div>
+
+            <div>
+              <label htmlFor="codigoEmpresa" className="form-label">
+                Código da Empresa (opcional)
+              </label>
+              <input
+                id="codigoEmpresa"
+                type="text"
+                className="input"
+                placeholder="Informe o código se já existe uma empresa"
+                {...register('codigoEmpresa')}
+                onBlur={handleCodigoEmpresaChange}
+              />
+              {codigoEmpresaError && <p className="form-error">{codigoEmpresaError}</p>}
             </div>
 
             <div>
@@ -257,19 +329,19 @@ const Register = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Ao criar uma conta, você concorda com nossos{' '}
-              <a
-                href="#"
+              <button
+                type="button"
                 className="font-medium text-primary-600 hover:text-primary-500"
               >
                 Termos de Serviço
-              </a>{' '}
+              </button>{' '}
               e{' '}
-              <a
-                href="#"
+              <button
+                type="button"
                 className="font-medium text-primary-600 hover:text-primary-500"
               >
                 Política de Privacidade
-              </a>
+              </button>
             </p>
           </div>
         </form>

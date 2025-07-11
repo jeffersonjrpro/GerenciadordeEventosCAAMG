@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Bell, X, Check, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
+import browserNotificationService from '../services/browserNotificationService';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastNotificationId, setLastNotificationId] = useState(null);
 
   // Buscar notificações e contagem
   const fetchNotifications = async () => {
@@ -18,8 +20,55 @@ const NotificationBell = () => {
         api.get('/notifications/unread-count')
       ]);
       
-      setNotifications(notificationsRes.data.data || []);
-      setUnreadCount(countRes.data.data.count || 0);
+      const newNotifications = notificationsRes.data.data || [];
+      const newCount = countRes.data.data.count || 0;
+      
+      // Verificar se há novas notificações não lidas
+      if (newCount > unreadCount && newNotifications.length > 0) {
+        const newestNotification = newNotifications[0];
+        
+        // Verificar se é uma notificação nova (não processada)
+        if (newestNotification.id !== lastNotificationId && !newestNotification.lida) {
+          setLastNotificationId(newestNotification.id);
+          
+          // Mostrar notificação do navegador
+          if (browserNotificationService.hasPermission()) {
+            if (newestNotification.tipo === 'LEMBRETE_AGENDAMENTO') {
+              // Extrair dados do agendamento da notificação
+              const agendamentoData = newestNotification.dados;
+              if (agendamentoData) {
+                browserNotificationService.showAgendamentoNotification({
+                  id: agendamentoData.agendamentoId,
+                  titulo: newestNotification.titulo.replace('Lembrete: ', ''),
+                  dataInicio: agendamentoData.dataInicio,
+                  descricao: agendamentoData.descricao || 'Sem descrição'
+                });
+              }
+            } else if (newestNotification.tipo === 'NOVA_DEMANDA') {
+              // Mostrar notificação de nova demanda
+              const demandaData = newestNotification.dados;
+              if (demandaData) {
+                browserNotificationService.showDemandaNotification({
+                  id: demandaData.demandaId,
+                  nomeProjeto: demandaData.nomeProjeto,
+                  criadoPor: { name: demandaData.criadoPor },
+                  prioridade: demandaData.prioridade,
+                  setor: { nome: demandaData.setor }
+                });
+              }
+            } else {
+              // Notificação genérica
+              browserNotificationService.showGenericNotification(
+                newestNotification.titulo,
+                newestNotification.mensagem
+              );
+            }
+          }
+        }
+      }
+      
+      setNotifications(newNotifications);
+      setUnreadCount(newCount);
     } catch (error) {
       console.error('Erro ao buscar notificações:', error);
     } finally {
@@ -84,6 +133,16 @@ const NotificationBell = () => {
     return message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   };
 
+  // Solicitar permissão para notificações do navegador
+  const requestNotificationPermission = async () => {
+    const granted = await browserNotificationService.requestPermission();
+    if (granted) {
+      toast.success('Notificações do navegador ativadas!');
+    } else {
+      toast.error('Permissão para notificações negada. Você pode ativar manualmente nas configurações do navegador.');
+    }
+  };
+
   // Buscar notificações ao montar componente
   useEffect(() => {
     fetchNotifications();
@@ -91,6 +150,37 @@ const NotificationBell = () => {
     // Atualizar a cada 30 segundos
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Verificar permissão de notificações na inicialização
+  useEffect(() => {
+    if (!browserNotificationService.hasPermission() && browserNotificationService.isNotificationSupported()) {
+      // Mostrar botão para solicitar permissão após alguns segundos
+      setTimeout(() => {
+        if (!browserNotificationService.hasPermission()) {
+          toast((t) => (
+            <div className="flex items-center gap-2">
+              <span>Ativar notificações do navegador?</span>
+              <button
+                onClick={() => {
+                  requestNotificationPermission();
+                  toast.dismiss(t.id);
+                }}
+                className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Ativar
+              </button>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+              >
+                Não
+              </button>
+            </div>
+          ), { duration: 10000 });
+        }
+      }, 5000);
+    }
   }, []);
 
   return (
@@ -115,6 +205,15 @@ const NotificationBell = () => {
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800">Notificações</h3>
             <div className="flex items-center gap-2">
+              {!browserNotificationService.hasPermission() && browserNotificationService.isNotificationSupported() && (
+                <button
+                  onClick={requestNotificationPermission}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  title="Ativar notificações do navegador"
+                >
+                  🔔
+                </button>
+              )}
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
@@ -133,7 +232,7 @@ const NotificationBell = () => {
           </div>
 
           {/* Lista de notificações */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-64 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-center text-gray-500">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
@@ -175,6 +274,7 @@ const NotificationBell = () => {
                           {formatDate(notification.criadoEm)}
                         </p>
                       </div>
+                      
                       <div className="flex items-center gap-1 ml-2">
                         {!notification.lida && (
                           <button

@@ -9,13 +9,15 @@ import { useAuth } from '../contexts/AuthContext';
 const prioridadeColors = {
   ALTA: 'bg-red-100 text-red-800',
   MEDIA: 'bg-yellow-100 text-yellow-800',
-  BAIXA: 'bg-green-100 text-green-800'
+  BAIXA: 'bg-green-100 text-green-800',
+  URGENTE: 'bg-red-600 text-white font-bold'
 };
 const statusColors = {
   ABERTO: 'bg-blue-100 text-blue-800',
   EM_ANDAMENTO: 'bg-yellow-100 text-yellow-800',
   CONCLUIDO: 'bg-green-100 text-green-800',
-  PAUSADO: 'bg-gray-100 text-gray-800'
+  PAUSADO: 'bg-gray-100 text-gray-800',
+  URGENTE: 'bg-red-600 text-white font-bold'
 };
 
 export default function Demandas({ sidebarCollapsed }) {
@@ -37,7 +39,15 @@ export default function Demandas({ sidebarCollapsed }) {
   const [arquivos, setArquivos] = useState([]);
   const [uploadingArquivo, setUploadingArquivo] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-
+  const [arquivosModal, setArquivosModal] = useState([]);
+  const [uploadingArquivoModal, setUploadingArquivoModal] = useState(false);
+  const [selectedFileModal, setSelectedFileModal] = useState(null);
+  const [testandoConexao, setTestandoConexao] = useState(false);
+  const [demandaCriada, setDemandaCriada] = useState(null);
+  const [criandoDemanda, setCriandoDemanda] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  
   const carregarEstatisticas = async () => {
     try {
       const { data } = await api.get('/demandas/estatisticas');
@@ -73,6 +83,48 @@ export default function Demandas({ sidebarCollapsed }) {
 
   const handleFiltro = e => setFiltros({ ...filtros, [e.target.name]: e.target.value });
 
+  const handleAbrirModal = async () => {
+    setShowModal(true);
+    setCriandoDemanda(true);
+    try {
+      // Cria a demanda definitiva ao abrir o modal (sem setor)
+      const { data } = await api.post('/demandas/definitiva', {});
+      setDemandaCriada(data.demandaDefinitiva);
+      setNovaDemanda({
+        ...novaDemanda,
+        solicitante: user?.name || ''
+      });
+      toast.success('Demanda criada com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao criar demanda');
+      setShowModal(false);
+    } finally {
+      setCriandoDemanda(false);
+    }
+  };
+
+  const handleSetorChange = (setorId) => {
+    setNovaDemanda({ ...novaDemanda, setorId });
+  };
+
+  const handleCancelarDemanda = async () => {
+    // Se criou uma demanda definitiva, deletar
+    if (demandaCriada && demandaCriada.id) {
+      try {
+        await api.delete(`/demandas/definitiva/${demandaCriada.id}`);
+      } catch (e) {}
+    }
+    // Limpar estados
+    setShowModal(false);
+    setNovaDemanda({ solicitante: user?.name || '' });
+    setDescricao('');
+    setObservacoes([]);
+    setArquivosModal([]);
+    setSelectedFileModal(null);
+    setEditandoDemandaId(null);
+    setDemandaCriada(null);
+  };
+
   const handleCriarDemanda = async () => {
     if (!novaDemanda.setorId) {
       setErroSetor('Selecione um setor para a demanda.');
@@ -88,29 +140,51 @@ export default function Demandas({ sidebarCollapsed }) {
       const dadosParaEnviar = {
         ...novaDemanda,
         descricao,
-        observacoesIniciais: observacoesValidas,
+        observacoesIniciais: observacoesValidas
       };
-
-      console.log('Dados sendo enviados:', dadosParaEnviar);
 
       if (editandoDemandaId) {
         const response = await api.put(`/demandas/${editandoDemandaId}`, dadosParaEnviar);
-        console.log('Resposta da edição:', response.data);
         toast.success('Demanda atualizada!');
+        // Upload de arquivos se necessário
+        if (arquivosModal.length > 0) {
+          const demandaAtualizada = response.data;
+          for (const arquivo of arquivosModal) {
+            try {
+              const formData = new FormData();
+              if (arquivo.arquivo) {
+                formData.append('arquivo', arquivo.arquivo);
+              } else {
+                continue;
+              }
+              await api.post(`/demandas/${demandaAtualizada.id}/arquivos`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+              });
+              toast.success(`Arquivo ${arquivo.nomeOriginal} enviado com sucesso!`);
+            } catch (error) {
+              toast.error(`Erro ao enviar arquivo ${arquivo.nomeOriginal}`);
+            }
+          }
+        }
       } else {
-        const response = await api.post('/demandas', dadosParaEnviar);
-        console.log('Resposta da criação:', response.data);
+        // Atualizar a demanda definitiva criada
+        if (!demandaCriada || !demandaCriada.id) {
+          toast.error('Demanda não foi criada corretamente. Tente novamente.');
+          return;
+        }
+        await api.put(`/demandas/definitiva/${demandaCriada.id}`, dadosParaEnviar);
         toast.success('Demanda criada!');
       }
       setShowModal(false);
       setNovaDemanda({ solicitante: user?.name || '' });
       setDescricao('');
       setObservacoes([]);
+      setArquivosModal([]);
+      setSelectedFileModal(null);
       setEditandoDemandaId(null);
+      setDemandaCriada(null);
       carregarDemandas();
     } catch (error) {
-      console.error('Erro detalhado:', error);
-      console.error('Resposta do servidor:', error.response?.data);
       toast.error(editandoDemandaId ? 'Erro ao atualizar demanda' : 'Erro ao criar demanda');
     }
   };
@@ -160,6 +234,18 @@ export default function Demandas({ sidebarCollapsed }) {
     }
   };
 
+  const handleFileSelectModal = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tamanho (máximo 100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error('Arquivo muito grande. Tamanho máximo: 100MB');
+        return;
+      }
+      setSelectedFileModal(file);
+    }
+  };
+
   const handleUploadArquivo = async () => {
     if (!selectedFile || !detalhe) return;
     
@@ -184,6 +270,47 @@ export default function Demandas({ sidebarCollapsed }) {
       toast.error(error.response?.data?.error || 'Erro ao enviar arquivo');
     } finally {
       setUploadingArquivo(false);
+    }
+  };
+
+  const handleUploadArquivoModal = async () => {
+    if (!selectedFileModal) {
+      toast.error('Selecione um arquivo para enviar.');
+      return;
+    }
+    
+    // Determinar qual ID da demanda usar
+    let demandaId;
+    if (editandoDemandaId) {
+      // Estamos editando uma demanda existente
+      demandaId = editandoDemandaId;
+    } else if (demandaCriada && demandaCriada.id) {
+      // Estamos criando uma nova demanda
+      demandaId = demandaCriada.id;
+    } else {
+      toast.error('Demanda não foi criada. Tente novamente.');
+      return;
+    }
+    
+    setUploadingArquivoModal(true);
+    try {
+      const formData = new FormData();
+      formData.append('arquivo', selectedFileModal);
+      const response = await api.post(`/demandas/${demandaId}/arquivos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const arquivoDefinitivo = {
+        ...response.data.data,
+        arquivo: selectedFileModal,
+        definitivo: true
+      };
+      setArquivosModal(prev => [...prev, arquivoDefinitivo]);
+      toast.success('Arquivo enviado com sucesso!');
+      setSelectedFileModal(null);
+    } catch (error) {
+      toast.error('Erro ao enviar arquivo');
+    } finally {
+      setUploadingArquivoModal(false);
     }
   };
 
@@ -216,6 +343,27 @@ export default function Demandas({ sidebarCollapsed }) {
       // Recarregar detalhes da demanda
       const response = await api.get(`/demandas/${detalhe.id}`);
       setDetalhe(response.data);
+    } catch (error) {
+      console.error('Erro ao remover arquivo:', error);
+      toast.error(error.response?.data?.error || 'Erro ao remover arquivo');
+    }
+  };
+
+  const handleRemoverArquivoModal = async (arquivoId) => {
+    if (!window.confirm('Tem certeza que deseja remover este arquivo?')) return;
+    
+    try {
+      if (editandoDemandaId) {
+        // Se está editando, remover do servidor
+        await api.delete(`/demandas/arquivos/${arquivoId}`);
+        toast.success('Arquivo removido com sucesso!');
+        // Remover o arquivo da lista local
+        setArquivosModal(arquivosModal.filter(arquivo => arquivo.id !== arquivoId));
+      } else {
+        // Se está criando, remover apenas da lista definitiva
+        setArquivosModal(arquivosModal.filter(arquivo => arquivo.id !== arquivoId));
+        toast.success('Arquivo removido da lista!');
+      }
     } catch (error) {
       console.error('Erro ao remover arquivo:', error);
       toast.error(error.response?.data?.error || 'Erro ao remover arquivo');
@@ -256,12 +404,163 @@ export default function Demandas({ sidebarCollapsed }) {
     }
   };
 
+  const handleTestarConexao = async () => {
+    setTestandoConexao(true);
+    try {
+      const response = await api.post('/demandas/testar-conexao-arquivos');
+      if (response.data.success) {
+        toast.success('Conexão com servidor de arquivos estabelecida com sucesso!');
+      } else {
+        toast.error('Falha na conexão com servidor de arquivos');
+      }
+    } catch (error) {
+      console.error('Erro ao testar conexão:', error);
+      toast.error('Erro ao testar conexão com servidor de arquivos');
+    } finally {
+      setTestandoConexao(false);
+    }
+  };
+
+  const handleAbrirPastaArquivo = async (arquivoId) => {
+    try {
+      const response = await api.get(`/demandas/arquivos/${arquivoId}/caminho`);
+      const { caminhoReal } = response.data;
+      
+      // Extrair o caminho da pasta do arquivo
+      const caminhoPasta = caminhoReal.substring(0, caminhoReal.lastIndexOf('\\'));
+      
+      // Copiar o caminho para a área de transferência
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(caminhoPasta);
+        toast.success('Caminho da pasta copiado! Cole no Windows Explorer.');
+      } else {
+        alert(`Caminho da pasta: ${caminhoPasta}\n\nCopie este caminho e cole no Windows Explorer para abrir a pasta.`);
+      }
+    } catch (error) {
+      console.error('Erro ao obter caminho da pasta:', error);
+      toast.error('Erro ao obter caminho da pasta.');
+    }
+  };
+
+  const handleVisualizarArquivo = async (arquivoId, nomeOriginal) => {
+    try {
+      const response = await api.get(`/demandas/arquivos/${arquivoId}/caminho`);
+      const { caminhoReal } = response.data;
+      
+      // Copiar o caminho do arquivo para a área de transferência
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(caminhoReal);
+        toast.success('Caminho do arquivo copiado! Cole no Windows Explorer para abrir.');
+      } else {
+        alert(`Caminho do arquivo: ${caminhoReal}\n\nCopie este caminho e cole no Windows Explorer para abrir o arquivo.`);
+      }
+    } catch (error) {
+      console.error('Erro ao obter caminho do arquivo:', error);
+      toast.error('Erro ao obter caminho do arquivo. Tente fazer download.');
+    }
+  };
+
+  const handlePreviewArquivo = async (arquivoId, nomeOriginal, tipoMime) => {
+    try {
+      setPreviewArquivo({
+        id: arquivoId,
+        nome: nomeOriginal,
+        tipo: tipoMime,
+        url: `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/demandas/arquivos/${arquivoId}/preview`
+      });
+      setShowPreviewModal(true);
+    } catch (error) {
+      console.error('Erro ao abrir preview:', error);
+      toast.error('Erro ao abrir preview do arquivo');
+    }
+  };
+
+  const isPreviewable = (tipoMime) => {
+    // Tipos de arquivo que podem ser exibidos no navegador
+    const previewableTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'text/plain', 'text/html', 'text/css', 'text/javascript',
+      'application/json', 'application/xml'
+    ];
+    return previewableTypes.includes(tipoMime);
+  };
+
+  const renderPreview = () => {
+    if (!previewArquivo) return null;
+
+    const { tipo, url, nome } = previewArquivo;
+
+    if (tipo.startsWith('image/')) {
+      return (
+        <div className="flex justify-center items-center h-full">
+          <img 
+            src={url} 
+            alt={nome}
+            className="max-w-full max-h-full object-contain"
+            onError={() => toast.error('Erro ao carregar imagem')}
+          />
+        </div>
+      );
+    }
+
+    if (tipo === 'application/pdf') {
+      return (
+        <iframe 
+          src={url}
+          className="w-full h-full border-0"
+          title={nome}
+          onError={() => toast.error('Erro ao carregar PDF')}
+        />
+      );
+    }
+
+    if (tipo.startsWith('text/')) {
+      return (
+        <iframe 
+          src={url}
+          className="w-full h-full border-0"
+          title={nome}
+          onError={() => toast.error('Erro ao carregar arquivo de texto')}
+        />
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center">
+        <File size={48} className="text-gray-400 mb-4" />
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{nome}</h3>
+        <p className="text-gray-500 mb-4">Este tipo de arquivo não pode ser visualizado no navegador</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleDownloadArquivo(previewArquivo.id, previewArquivo.nome)}
+            className="btn btn-primary"
+          >
+            <Download size={16} />
+            Download
+          </button>
+          <button
+            onClick={() => handleVisualizarArquivo(previewArquivo.id, previewArquivo.nome)}
+            className="btn btn-outline"
+          >
+            <Eye size={16} />
+            Copiar Caminho
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="transition-all duration-300 w-full px-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
         <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">Demandas & Projetos</h1>
-        <button className="btn btn-primary flex items-center gap-2 w-full sm:w-auto justify-center" onClick={() => setShowModal(true)}>
-          <Plus size={18}/>Nova Demanda
+        <button 
+          className="btn btn-primary flex items-center gap-2 w-full sm:w-auto justify-center" 
+          onClick={handleAbrirModal}
+        >
+          <Plus size={18}/>
+          Nova Demanda
         </button>
       </div>
 
@@ -333,6 +632,7 @@ export default function Demandas({ sidebarCollapsed }) {
           <option value="ALTA">Alta</option>
           <option value="MEDIA">Média</option>
           <option value="BAIXA">Baixa</option>
+          <option value="URGENTE">Urgente</option>
         </select>
         <select name="responsavelId" value={filtros.responsavelId} onChange={handleFiltro} className="input text-sm">
           <option value="">Todos Responsáveis</option>
@@ -359,10 +659,9 @@ export default function Demandas({ sidebarCollapsed }) {
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Sol.</th>
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prior.</th>
+                <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entrega</th>
-                <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fluig</th>
                 <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resp.</th>
                 <th className="px-2 md:px-4 py-3"></th>
               </tr>
@@ -387,7 +686,7 @@ export default function Demandas({ sidebarCollapsed }) {
                   </td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap">
                     <span className={`px-1 md:px-2 py-1 rounded text-xs md:text-sm ${prioridadeColors[d.prioridade]}`}>
-                      {d.prioridade === 'ALTA' ? 'A' : d.prioridade === 'MEDIA' ? 'M' : 'B'}
+                      {d.prioridade === 'ALTA' ? 'Alta' : d.prioridade === 'MEDIA' ? 'Média' : d.prioridade === 'BAIXA' ? 'Baixa' : d.prioridade === 'URGENTE' ? 'Urgente' : d.prioridade}
                     </span>
                   </td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap">
@@ -396,7 +695,6 @@ export default function Demandas({ sidebarCollapsed }) {
                     </span>
                   </td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap text-sm">{new Date(d.dataEntrega).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-2 md:px-4 py-2 whitespace-nowrap font-mono text-green-700 text-sm">{d.numeroFluig || '-'}</td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap">
                     <div className="flex flex-col gap-1 max-w-[80px]">
                       {d.responsaveis.slice(0, 2).map(u => {
@@ -416,26 +714,45 @@ export default function Demandas({ sidebarCollapsed }) {
                   </td>
                   <td className="px-2 md:px-4 py-2 whitespace-nowrap">
                     <div className="flex gap-1 md:gap-2 items-center">
-                      <button className="btn btn-sm btn-outline flex items-center p-1 md:p-2" title="Ver Detalhes" onClick={() => setDetalhe(d)}>
+                      <button className="btn btn-sm btn-outline flex items-center p-1 md:p-2" title="Ver Detalhes" onClick={async () => {
+                        try {
+                          const response = await api.get(`/demandas/${d.id}`);
+                          const demandaCompleta = response.data;
+                          
+                          setDetalhe(demandaCompleta);
+                        } catch (error) {
+                          console.error('Erro ao carregar detalhes:', error);
+                          toast.error('Erro ao carregar detalhes da demanda');
+                        }
+                      }}>
                         <Eye size={14}/>
                       </button>
-                      <button className="btn btn-sm btn-outline flex items-center p-1 md:p-2" title="Editar Demanda" onClick={() => {
-                        setNovaDemanda({
-                          nomeProjeto: d.nomeProjeto,
-                          setorId: d.setor?.id,
-                          solicitante: d.solicitante,
-                          prioridade: d.prioridade,
-                          status: d.status,
-                          dataEntrega: d.dataEntrega ? d.dataEntrega.split('T')[0] : '',
-                          linkPastaProjeto: d.linkPastaProjeto || '',
-                          linkSite: d.linkSite || '',
-                          responsaveisIds: d.responsaveis?.map(u => u.id) || [],
-                          numeroFluig: d.numeroFluig || '',
-                        });
-                        setDescricao(d.descricao || '');
-                        setObservacoes(d.observacoes || []);
-                        setEditandoDemandaId(d.id);
-                        setShowModal(true);
+                      <button className="btn btn-sm btn-outline flex items-center p-1 md:p-2" title="Editar Demanda" onClick={async () => {
+                        try {
+                          const response = await api.get(`/demandas/${d.id}`);
+                          const demandaCompleta = response.data;
+                          
+                          setNovaDemanda({
+                            nomeProjeto: demandaCompleta.nomeProjeto,
+                            setorId: demandaCompleta.setor?.id,
+                            solicitante: demandaCompleta.solicitante,
+                            prioridade: demandaCompleta.prioridade,
+                            status: demandaCompleta.status,
+                            dataEntrega: demandaCompleta.dataEntrega ? demandaCompleta.dataEntrega.split('T')[0] : '',
+                            linkPastaProjeto: demandaCompleta.linkPastaProjeto || '',
+                            linkSite: demandaCompleta.linkSite || '',
+                            responsaveisIds: demandaCompleta.responsaveis?.map(u => u.id) || [],
+                            numeroFluig: demandaCompleta.numeroFluig || '',
+                          });
+                          setDescricao(demandaCompleta.descricao || '');
+                          setObservacoes(demandaCompleta.observacoes || []);
+                          setArquivosModal(demandaCompleta.arquivos || []);
+                          setEditandoDemandaId(demandaCompleta.id);
+                          setShowModal(true);
+                        } catch (error) {
+                          console.error('Erro ao carregar detalhes para edição:', error);
+                          toast.error('Erro ao carregar detalhes da demanda');
+                        }
                       }}>
                         <Edit size={14}/>
                       </button>
@@ -472,72 +789,345 @@ export default function Demandas({ sidebarCollapsed }) {
 
       {/* Modal Nova Demanda */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-            <h2 className="text-xl font-bold mb-4">{editandoDemandaId ? 'Editar Demanda' : 'Nova Demanda'}</h2>
-            {/* Campos do formulário */}
-            <input className="input mb-2" placeholder="Nome do Projeto" value={novaDemanda.nomeProjeto || ''} onChange={e => setNovaDemanda({ ...novaDemanda, nomeProjeto: e.target.value })} />
-            <div className="flex gap-2 mb-2 items-center">
-              <select className="input flex-1" value={novaDemanda.setorId || ''} onChange={e => setNovaDemanda({ ...novaDemanda, setorId: e.target.value })}>
-                <option value="">Selecione o Setor</option>
-                {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-              </select>
-              <button className="btn btn-sm btn-outline" onClick={() => setShowNovoSetor(true)}>Novo Setor</button>
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">{editandoDemandaId ? 'Editar Demanda' : 'Nova Demanda'}</h2>
+              <button 
+                onClick={handleCancelarDemanda}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={24} />
+              </button>
             </div>
-            {showNovoSetor && (
-              <div className="flex gap-2 mb-2">
-                <input className="input flex-1" placeholder="Nome do novo setor" value={novoSetorNome} onChange={e => setNovoSetorNome(e.target.value)} />
-                <button className="btn btn-primary" onClick={handleCriarSetor}>Salvar</button>
-                <button className="btn btn-secondary" onClick={() => setShowNovoSetor(false)}>Cancelar</button>
+
+            {/* Indicador de pasta definitiva */}
+            {!editandoDemandaId && (
+              <div className="mb-4">
+                {criandoDemanda ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-blue-800 text-sm">Criando demanda...</span>
+                  </div>
+                ) : demandaCriada ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-800 text-sm">
+                      Demanda criada: <span className="font-mono">{demandaCriada.solicitacao}</span> | Pasta: <span className="font-mono">\\caafiles-v\App_Eventos\{demandaCriada.solicitacao}</span>
+                    </span>
+                  </div>
+                ) : null}
               </div>
             )}
-            {erroSetor && <div className="text-red-500 text-xs mb-2">{erroSetor}</div>}
-            <input className="input mb-2" placeholder="Solicitante" value={novaDemanda.solicitante || ''} onChange={e => setNovaDemanda({ ...novaDemanda, solicitante: e.target.value })} />
-            <textarea className="input mb-2" placeholder="Descrição do Projeto" value={descricao} onChange={e => setDescricao(e.target.value)} />
-            <input className="input mb-2" placeholder="Link da pasta de projeto" value={novaDemanda.linkPastaProjeto || ''} onChange={e => setNovaDemanda({ ...novaDemanda, linkPastaProjeto: e.target.value })} />
-            <input className="input mb-2" placeholder="Link do site" value={novaDemanda.linkSite || ''} onChange={e => setNovaDemanda({ ...novaDemanda, linkSite: e.target.value })} />
-            <input className="input mb-2" placeholder="Número Fluig" value={novaDemanda.numeroFluig || ''} onChange={e => setNovaDemanda({ ...novaDemanda, numeroFluig: e.target.value })} />
-            <select className="input mb-2" value={novaDemanda.prioridade || ''} onChange={e => setNovaDemanda({ ...novaDemanda, prioridade: e.target.value })}>
-              <option value="">Prioridade</option>
-              <option value="ALTA" style={{ color: '#dc2626', fontWeight: 'bold', background: '#fee2e2' }}>Alta</option>
-              <option value="MEDIA" style={{ color: '#ca8a04', fontWeight: 'bold', background: '#fef9c3' }}>Média</option>
-              <option value="BAIXA" style={{ color: '#16a34a', fontWeight: 'bold', background: '#dcfce7' }}>Baixa</option>
-            </select>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data de Entrega</label>
-            <input className="input mb-2" type="date" value={novaDemanda.dataEntrega || ''} onChange={e => setNovaDemanda({ ...novaDemanda, dataEntrega: e.target.value })} />
-            <select className="input mb-2" value={novaDemanda.status || 'ABERTO'} onChange={e => setNovaDemanda({ ...novaDemanda, status: e.target.value })}>
-              <option value="ABERTO">Aberto</option>
-              <option value="EM_ANDAMENTO">Em andamento</option>
-              <option value="CONCLUIDO">Concluído</option>
-              <option value="PAUSADO">Pausado</option>
-            </select>
-            <div className="mb-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Observações Iniciais</label>
-              {observacoes.map((obs, idx) => (
-                <div key={idx} className="flex gap-2 mb-1 items-center">
-                  <textarea className="input flex-1" placeholder="Observação" value={obs.texto} onChange={e => handleObservacaoChange(idx, e.target.value)} />
-                  <span className="text-xs text-gray-500">{new Date(obs.data).toLocaleDateString()}</span>
+
+            <div className="space-y-4">
+              {/* Nome do Projeto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Projeto *</label>
+                <input 
+                  className="input w-full" 
+                  placeholder="Nome do Projeto" 
+                  value={novaDemanda.nomeProjeto || ''} 
+                  onChange={e => setNovaDemanda({ ...novaDemanda, nomeProjeto: e.target.value })} 
+                />
+              </div>
+
+              {/* Setor e Novo Setor */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Setor *</label>
+                  <select 
+                    className="input w-full" 
+                    value={novaDemanda.setorId || ''} 
+                    onChange={e => handleSetorChange(e.target.value)}
+                  >
+                    <option value="">Selecione o Setor</option>
+                    {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                  </select>
                 </div>
-              ))}
-              <button className="btn btn-sm btn-outline mt-1" onClick={handleAdicionarObservacao}>Adicionar Observação</button>
+                <div className="flex items-end">
+                  <button 
+                    className="btn btn-outline w-full" 
+                    onClick={() => setShowNovoSetor(true)}
+                  >
+                    Novo Setor
+                  </button>
+                </div>
+              </div>
+
+              {showNovoSetor && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="md:col-span-2">
+                    <input 
+                      className="input w-full" 
+                      placeholder="Nome do novo setor" 
+                      value={novoSetorNome} 
+                      onChange={e => setNovoSetorNome(e.target.value)} 
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="btn btn-primary flex-1" onClick={handleCriarSetor}>Salvar</button>
+                    <button className="btn btn-secondary flex-1" onClick={() => setShowNovoSetor(false)}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              {erroSetor && <div className="text-red-500 text-sm">{erroSetor}</div>}
+
+              {/* Solicitante */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Solicitante</label>
+                <input 
+                  className="input w-full" 
+                  placeholder="Solicitante" 
+                  value={novaDemanda.solicitante || ''} 
+                  onChange={e => setNovaDemanda({ ...novaDemanda, solicitante: e.target.value })} 
+                />
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição do Projeto</label>
+                <textarea 
+                  className="input w-full" 
+                  rows="3"
+                  placeholder="Descrição do Projeto" 
+                  value={descricao} 
+                  onChange={e => setDescricao(e.target.value)} 
+                />
+              </div>
+
+              {/* Links */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Link do Site</label>
+                  <input 
+                    className="input w-full" 
+                    placeholder="Link do site" 
+                    value={novaDemanda.linkSite || ''} 
+                    onChange={e => setNovaDemanda({ ...novaDemanda, linkSite: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              {/* Número Fluig e Prioridade */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Número Fluig</label>
+                  <input 
+                    className="input w-full" 
+                    placeholder="Número Fluig" 
+                    value={novaDemanda.numeroFluig || ''} 
+                    onChange={e => setNovaDemanda({ ...novaDemanda, numeroFluig: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                  <select 
+                    className="input w-full" 
+                    value={novaDemanda.prioridade || ''} 
+                    onChange={e => setNovaDemanda({ ...novaDemanda, prioridade: e.target.value })}
+                  >
+                    <option value="">Selecione a Prioridade</option>
+                    <option value="ALTA" style={{ color: '#dc2626', fontWeight: 'bold', background: '#fee2e2' }}>Alta</option>
+                    <option value="MEDIA" style={{ color: '#ca8a04', fontWeight: 'bold', background: '#fef9c3' }}>Média</option>
+                    <option value="BAIXA" style={{ color: '#16a34a', fontWeight: 'bold', background: '#dcfce7' }}>Baixa</option>
+                    <option value="URGENTE" style={{ color: '#b91c1c', fontWeight: 'bold', background: '#fee2e2' }}>Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Data de Entrega e Status - LADO A LADO */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Entrega</label>
+                  <input 
+                    className="input w-full" 
+                    type="date" 
+                    value={novaDemanda.dataEntrega || ''} 
+                    onChange={e => setNovaDemanda({ ...novaDemanda, dataEntrega: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select 
+                    className="input w-full" 
+                    value={novaDemanda.status || 'ABERTO'} 
+                    onChange={e => setNovaDemanda({ ...novaDemanda, status: e.target.value })}
+                  >
+                    <option value="ABERTO">Aberto</option>
+                    <option value="EM_ANDAMENTO">Em andamento</option>
+                    <option value="CONCLUIDO">Concluído</option>
+                    <option value="PAUSADO">Pausado</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Responsáveis */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Responsáveis (quem executa)</label>
+                <select
+                  className="input w-full"
+                  multiple
+                  size="4"
+                  value={novaDemanda.responsaveisIds || []}
+                  onChange={e => {
+                    const options = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                    setNovaDemanda({ ...novaDemanda, responsaveisIds: options });
+                  }}
+                >
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.nome}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Pressione Ctrl (ou Cmd) para selecionar múltiplos</p>
+              </div>
+
+              {/* Arquivos */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Arquivos</label>
+                  <button
+                    type="button"
+                    onClick={handleTestarConexao}
+                    disabled={testandoConexao}
+                    className="btn btn-sm btn-outline text-xs"
+                  >
+                    {testandoConexao ? 'Testando...' : 'Testar Conexão'}
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="file"
+                    onChange={handleFileSelectModal}
+                    className="hidden"
+                    id="file-upload-modal"
+                    accept="*/*"
+                  />
+                  <label
+                    htmlFor="file-upload-modal"
+                    className="btn btn-sm btn-outline flex items-center gap-2 cursor-pointer"
+                    title="Selecionar arquivo"
+                  >
+                    <Upload size={14} />
+                    Selecionar
+                  </label>
+                  {selectedFileModal && (
+                    <button
+                      onClick={handleUploadArquivoModal}
+                      disabled={uploadingArquivoModal}
+                      className="btn btn-sm btn-primary flex items-center gap-2"
+                    >
+                      {uploadingArquivoModal ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Paperclip size={14} />
+                          Enviar
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {selectedFileModal && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <File size={16} className="text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800">{selectedFileModal.name}</span>
+                        <span className="text-xs text-blue-600">({formatFileSize(selectedFileModal.size)})</span>
+                      </div>
+                      <button
+                        onClick={() => setSelectedFileModal(null)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {arquivosModal.length > 0 && (
+                  <div className="bg-gray-50 p-3 rounded-lg border space-y-2">
+                    {arquivosModal.map((arquivo) => (
+                      <div key={arquivo.id} className="bg-white p-2 rounded border flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {isPreviewable(arquivo.tipoMime) ? (
+                            <button
+                              onClick={() => handlePreviewArquivo(arquivo.id, arquivo.nomeOriginal, arquivo.tipoMime)}
+                              className="btn btn-xs btn-outline text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                              title="Visualizar"
+                            >
+                              <Eye size={12} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleVisualizarArquivo(arquivo.id, arquivo.nomeOriginal)}
+                              className="btn btn-xs btn-outline text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                              title="Copiar Caminho"
+                            >
+                              <Eye size={12} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoverArquivoModal(arquivo.id)}
+                            className="btn btn-xs btn-outline text-red-600 hover:text-red-800 flex items-center gap-1"
+                            title="Remover"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Observações Iniciais</label>
+                {observacoes.map((obs, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2 items-start">
+                    <textarea 
+                      className="input flex-1" 
+                      rows="2"
+                      placeholder="Observação" 
+                      value={obs.texto} 
+                      onChange={e => handleObservacaoChange(idx, e.target.value)} 
+                    />
+                    <span className="text-xs text-gray-500 mt-2 whitespace-nowrap">{new Date(obs.data).toLocaleDateString()}</span>
+                  </div>
+                ))}
+                <button 
+                  className="btn btn-outline text-sm" 
+                  onClick={handleAdicionarObservacao}
+                >
+                  + Adicionar Observação
+                </button>
+              </div>
             </div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Responsáveis (quem executa)</label>
-            <select
-              className="input mb-2"
-              multiple
-              value={novaDemanda.responsaveisIds || []}
-              onChange={e => {
-                const options = Array.from(e.target.selectedOptions).map(opt => opt.value);
-                setNovaDemanda({ ...novaDemanda, responsaveisIds: options });
-              }}
-            >
-              {usuarios.map(u => (
-                <option key={u.id} value={u.id}>{u.name || u.nome}</option>
-              ))}
-            </select>
-            <div className="flex gap-2 mt-4">
-              <button className="btn btn-primary" onClick={handleCriarDemanda}>Salvar</button>
-              <button className="btn btn-secondary" onClick={() => { setShowModal(false); setEditandoDemandaId(null); }}>Cancelar</button>
+
+            {/* Botões de ação */}
+            <div className="flex gap-3 mt-6 pt-4 border-t">
+              <button 
+                className="btn btn-primary flex-1" 
+                onClick={handleCriarDemanda}
+              >
+                {editandoDemandaId ? 'Atualizar' : 'Criar'} Demanda
+              </button>
+              <button 
+                className="btn btn-secondary flex-1" 
+                onClick={handleCancelarDemanda}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -591,16 +1181,49 @@ export default function Demandas({ sidebarCollapsed }) {
             )}
 
             {/* Links */}
-            {(detalhe.linkPastaProjeto || detalhe.linkSite) && (
+            {(detalhe.linkSite) && (
               <div className="mb-6">
                 <span className="font-semibold text-gray-700 block mb-2">Links:</span>
                 <div className="space-y-2">
-                  {detalhe.linkPastaProjeto && (
-                    <div><span className="font-medium text-gray-600">Pasta do Projeto:</span> <a href={detalhe.linkPastaProjeto} className="text-blue-600 hover:text-blue-800 underline ml-2" target="_blank" rel="noopener noreferrer">Abrir pasta</a></div>
-                  )}
                   {detalhe.linkSite && (
                     <div><span className="font-medium text-gray-600">Site:</span> <a href={detalhe.linkSite} className="text-blue-600 hover:text-blue-800 underline ml-2" target="_blank" rel="noopener noreferrer">Abrir site</a></div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Caminho dos Arquivos */}
+            {detalhe.arquivos?.length > 0 && (
+              <div className="mb-6">
+                <span className="font-semibold text-gray-700 block mb-2">Caminho dos Arquivos:</span>
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" className="text-gray-500">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                      </svg>
+                      <span className="font-mono text-sm text-gray-700">
+                        \\caafiles-v\App_Eventos\{detalhe.solicitacao}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const caminho = `\\\\caafiles-v\\App_Eventos\\${detalhe.solicitacao}`;
+                        if (navigator.clipboard) {
+                          await navigator.clipboard.writeText(caminho);
+                          toast.success('Caminho copiado!');
+                        } else {
+                          alert(`Caminho: ${caminho}\n\nCopie este caminho e cole no Windows Explorer.`);
+                        }
+                      }}
+                      className="btn btn-xs btn-outline text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      title="Copiar Caminho"
+                    >
+                      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -694,19 +1317,39 @@ export default function Demandas({ sidebarCollapsed }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {isPreviewable(arquivo.tipoMime) ? (
+                          <button
+                            onClick={() => handlePreviewArquivo(arquivo.id, arquivo.nomeOriginal, arquivo.tipoMime)}
+                            className="btn btn-xs btn-outline text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            title="Visualizar"
+                          >
+                            <Eye size={12} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleVisualizarArquivo(arquivo.id, arquivo.nomeOriginal)}
+                            className="btn btn-xs btn-outline text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            title="Copiar Caminho"
+                          >
+                            <Eye size={12} />
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleDownloadArquivo(arquivo.id, arquivo.nomeOriginal)}
-                          className="btn btn-sm btn-outline flex items-center gap-1"
-                          title="Download"
+                          onClick={() => handleAbrirPastaArquivo(arquivo.id)}
+                          className="btn btn-xs btn-outline text-green-600 hover:text-green-800 flex items-center gap-1"
+                          title="Abrir Pasta"
                         >
-                          <Download size={14} />
+                          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleRemoverArquivo(arquivo.id)}
-                          className="btn btn-sm btn-outline text-red-600 hover:text-red-800 flex items-center gap-1"
+                          className="btn btn-xs btn-outline text-red-600 hover:text-red-800 flex items-center gap-1"
                           title="Remover"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
@@ -757,6 +1400,63 @@ export default function Demandas({ sidebarCollapsed }) {
                 <Trash2 size={18}/>Excluir
               </button>
               <button className="btn btn-secondary" onClick={() => setDetalhe(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[80vh] relative flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Eye size={20} />
+                Preview: {previewArquivo?.nome}
+              </h2>
+              <button 
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 p-6 overflow-hidden">
+              <div className="w-full h-full">
+                {renderPreview()}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="flex justify-between items-center p-6 border-t bg-gray-50">
+              <div className="text-sm text-gray-600">
+                {previewArquivo?.tipo} • {formatFileSize(previewArquivo?.tamanho || 0)}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleDownloadArquivo(previewArquivo?.id, previewArquivo?.nome)}
+                  className="btn btn-outline btn-sm"
+                >
+                  <Download size={16} />
+                  Download
+                </button>
+                <button
+                  onClick={() => handleVisualizarArquivo(previewArquivo?.id, previewArquivo?.nome)}
+                  className="btn btn-outline btn-sm"
+                >
+                  <Eye size={16} />
+                  Copiar Caminho
+                </button>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>

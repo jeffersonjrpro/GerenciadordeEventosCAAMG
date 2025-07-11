@@ -17,7 +17,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 const Guests = () => {
@@ -34,6 +36,11 @@ const Guests = () => {
   const [event, setEvent] = useState(null);
   const [customFields, setCustomFields] = useState([]);
   const [formLink, setFormLink] = useState('');
+  
+  // Estados para modal de exclusão
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [guestToDelete, setGuestToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     console.log('Guests - eventId recebido:', eventId);
@@ -143,6 +150,31 @@ const Guests = () => {
       alert('Erro ao importar arquivo');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleDeleteGuest = (guest) => {
+    setGuestToDelete(guest);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!guestToDelete) return;
+
+    try {
+      setDeleting(true);
+      await api.delete(`/guests/events/${eventId}/guests/${guestToDelete.id}`);
+      
+      // Remover o convidado da lista local
+      setGuests(guests.filter(g => g.id !== guestToDelete.id));
+      
+      setShowDeleteModal(false);
+      setGuestToDelete(null);
+    } catch (error) {
+      console.error('Erro ao deletar convidado:', error);
+      alert('Erro ao deletar convidado');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -383,6 +415,13 @@ const Guests = () => {
                         >
                           Editar
                         </button>
+                        <button
+                          onClick={() => handleDeleteGuest(guest)}
+                          className="text-red-600 hover:text-red-900 inline-flex items-center"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Excluir
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -433,6 +472,61 @@ const Guests = () => {
                     className="btn-primary"
                   >
                     {importing ? 'Importando...' : 'Importar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-6 w-full max-w-md">
+            <div className="relative bg-white rounded-lg shadow-xl">
+              {/* Header */}
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              
+              {/* Content */}
+              <div className="text-center px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Confirmar Exclusão
+                </h3>
+                <p className="text-sm text-gray-600 mb-6">
+                  Tem certeza que deseja excluir o convidado <strong>"{guestToDelete?.name}"</strong>?
+                </p>
+                <p className="text-xs text-gray-500 mb-6">
+                  Esta ação não pode ser desfeita e removerá permanentemente todos os dados do convidado.
+                </p>
+                
+                {/* Actions */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={deleting}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={deleting}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {deleting ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Excluindo...
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </div>
+                    )}
                   </button>
                 </div>
               </div>

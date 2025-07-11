@@ -36,7 +36,8 @@ const Profile = () => {
       name: user?.name || '',
       email: user?.email || '',
       telefone: user?.telefone || '',
-      nomeEmpresa: user?.nomeEmpresa || ''
+      nomeEmpresa: user?.nomeEmpresa || '',
+      codigoEmpresa: user?.codigoEmpresa || ''
     }
   });
 
@@ -48,7 +49,8 @@ const Profile = () => {
         name: user.name,
         email: user.email,
         telefone: user.telefone || '',
-        nomeEmpresa: user.nomeEmpresa || ''
+        nomeEmpresa: user.nomeEmpresa || '',
+        codigoEmpresa: user.codigoEmpresa || ''
       });
     }
   }, [user, reset]);
@@ -58,8 +60,8 @@ const Profile = () => {
     setMessage(null);
 
     try {
-      const { name, email, telefone, nomeEmpresa } = data;
-      const result = await updateProfile({ name, email, telefone, nomeEmpresa });
+      const { name, email, telefone, nomeEmpresa, codigoEmpresa } = data;
+      const result = await updateProfile({ name, email, telefone, nomeEmpresa, codigoEmpresa });
       if (result.success) {
         setMessage('Perfil atualizado com sucesso!');
         setMessageType('success');
@@ -255,12 +257,39 @@ const Profile = () => {
                           message: 'Nome da empresa deve ter pelo menos 1 caractere',
                         },
                       })}
+                      disabled={user?.empresaId || user?.codigoEmpresa}
                     />
                   </div>
                   {errors.nomeEmpresa && (
                     <p className="form-error">{errors.nomeEmpresa.message}</p>
                   )}
                 </div>
+
+                {/* Campo Código da Empresa */}
+                {!user?.empresaId && (
+                  <div>
+                    <label htmlFor="codigoEmpresa" className="form-label">
+                      Código da Empresa
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="codigoEmpresa"
+                        type="text"
+                        className="input"
+                        placeholder="Informe o código para se vincular a uma empresa"
+                        {...register('codigoEmpresa', {
+                          minLength: {
+                            value: 6,
+                            message: 'O código deve ter pelo menos 6 caracteres',
+                          },
+                        })}
+                      />
+                    </div>
+                    {errors.codigoEmpresa && (
+                      <p className="form-error">{errors.codigoEmpresa.message}</p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex justify-end">
                   <button
@@ -443,6 +472,22 @@ const Profile = () => {
               <div>
                 <p className="text-sm font-medium text-gray-500">Nome da Empresa</p>
                 <p className="text-sm text-gray-900">{user?.nomeEmpresa || 'Não informado'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Código da Empresa</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded select-all">{user?.codigoEmpresa || 'Não informado'}</p>
+                  {user?.codigoEmpresa && (
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:underline text-xs"
+                      onClick={() => {navigator.clipboard.writeText(user.codigoEmpresa)}}
+                    >
+                      Copiar
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Compartilhe este código com funcionários para que eles se cadastrem na sua empresa.</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Membro desde</p>

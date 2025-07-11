@@ -24,10 +24,47 @@ module.exports = {
       return res.status(500).json({ error: 'Erro ao listar agendamentos' });
     }
   },
+
+  async buscarPorId(req, res) {
+    try {
+      const { id } = req.params;
+      const { id: userId, empresaId, role } = req.user;
+      
+      const agendamento = await prisma.agendamento.findUnique({
+        where: { id },
+        include: {
+          criadoPor: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      if (!agendamento) {
+        return res.status(404).json({ error: 'Agendamento não encontrado' });
+      }
+
+      // Verificar permissão
+      if (role !== 'ADMIN' && agendamento.criadoPorId !== userId && 
+          (agendamento.visibilidade !== 'EQUIPE' || agendamento.equipeId !== empresaId)) {
+        return res.status(403).json({ error: 'Sem permissão para visualizar este agendamento' });
+      }
+
+      return res.json(agendamento);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar agendamento' });
+    }
+  },
+
   async criar(req, res) {
     try {
-      const { titulo, descricao, dataInicio, dataFim, categoria, lembreteMinutosAntes, visibilidade } = req.body;
+      const { titulo, descricao, dataInicio, dataFim, categoria, lembreteMinutosAntes, visibilidade, notificarAutomaticamente = true } = req.body;
       const { id: userId, empresaId, role } = req.user;
+      
       // Cria o agendamento
       const agendamento = await prisma.agendamento.create({
         data: {
@@ -42,53 +79,34 @@ module.exports = {
           visibilidade
         }
       });
-      // Agendar lembrete in-app
-      const lembreteDate = new Date(new Date(dataInicio).getTime() - lembreteMinutosAntes * 60000);
-      // Para simplificação, já cria a notificação se a data for futura
-      let notificados = [];
-      if (visibilidade === 'EQUIPE') {
-        // Notifica todos da equipe
-        const equipe = await prisma.user.findMany({ where: { empresaId, ativo: true } });
-        notificados = await Promise.all(equipe.map(u =>
-          prisma.notification.create({
-            data: {
-              userId: u.id,
-              agendamentoId: agendamento.id,
-              mensagem: `Lembrete: ${titulo} em breve!`,
-              lida: false
-            }
-          })
-        ));
-      } else {
-        // Notifica só o criador
-        notificados = [await prisma.notification.create({
-          data: {
-            userId: userId,
-            agendamentoId: agendamento.id,
-            mensagem: `Lembrete: ${titulo} em breve!`,
-            lida: false
-          }
-        })];
-      }
-      // Placeholder para e-mail
-      // TODO: Agendar envio de e-mail (em desenvolvimento)
-      return res.status(201).json({ agendamento, lembretes: notificados, email: 'Envio de e-mail: em desenvolvimento' });
+      
+      // As notificações serão criadas automaticamente pelo scheduler no momento correto
+      console.log(`✅ Agendamento criado: ${titulo} - Notificações serão enviadas ${lembreteMinutosAntes} minutos antes`);
+      
+      return res.status(201).json({ 
+        agendamento, 
+        message: `Agendamento criado com sucesso. Lembrete será enviado ${lembreteMinutosAntes} minutos antes do início.`,
+        notificacaoAutomatica: notificarAutomaticamente
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao criar agendamento' });
     }
   },
+
   async editar(req, res) {
     try {
       const { id } = req.params;
       const { titulo, descricao, dataInicio, dataFim, categoria, lembreteMinutosAntes, visibilidade } = req.body;
       const { id: userId, empresaId, role } = req.user;
+      
       // Busca o agendamento
       const agendamento = await prisma.agendamento.findUnique({ where: { id } });
       if (!agendamento) return res.status(404).json({ error: 'Agendamento não encontrado' });
       if (role !== 'ADMIN' && agendamento.criadoPorId !== userId) {
         return res.status(403).json({ error: 'Sem permissão para editar' });
       }
+      
       // Atualiza o agendamento
       const atualizado = await prisma.agendamento.update({
         where: { id },
@@ -102,39 +120,24 @@ module.exports = {
           visibilidade
         }
       });
-      // Remove notificações antigas
-      await prisma.notification.deleteMany({ where: { agendamentoId: id } });
-      // Cria novas notificações
-      let notificados = [];
-      if (visibilidade === 'EQUIPE') {
-        const equipe = await prisma.user.findMany({ where: { empresaId, ativo: true } });
-        notificados = await Promise.all(equipe.map(u =>
-          prisma.notification.create({
-            data: {
-              userId: u.id,
-              agendamentoId: atualizado.id,
-              mensagem: `Lembrete: ${titulo} em breve!`,
-              lida: false
-            }
-          })
-        ));
-      } else {
-        notificados = [await prisma.notification.create({
-          data: {
-            userId: userId,
-            agendamentoId: atualizado.id,
-            mensagem: `Lembrete: ${titulo} em breve!`,
-            lida: false
+      
+      // Remove notificações antigas relacionadas a este agendamento
+      await prisma.notification.deleteMany({
+        where: {
+          dados: {
+            path: ['agendamentoId'],
+            equals: id
           }
-        })];
-      }
-      // Placeholder para e-mail
-      return res.json({ agendamento: atualizado, lembretes: notificados, email: 'Envio de e-mail: em desenvolvimento' });
+        }
+      });
+      
+      return res.json(atualizado);
     } catch (error) {
-      console.error(error);
+      console.error('Erro ao editar agendamento:', error);
       return res.status(500).json({ error: 'Erro ao editar agendamento' });
     }
   },
+
   async excluir(req, res) {
     try {
       const { id } = req.params;
@@ -145,7 +148,15 @@ module.exports = {
         return res.status(403).json({ error: 'Sem permissão para excluir' });
       }
       // Remove notificações
-      await prisma.notification.deleteMany({ where: { agendamentoId: id } });
+      await prisma.notification.deleteMany({ 
+        where: { 
+          tipo: 'LEMBRETE_AGENDAMENTO',
+          dados: {
+            path: ['agendamentoId'],
+            equals: id
+          }
+        } 
+      });
       // Remove agendamento
       await prisma.agendamento.delete({ where: { id } });
       return res.json({ message: 'Agendamento e lembretes removidos' });
@@ -154,6 +165,7 @@ module.exports = {
       return res.status(500).json({ error: 'Erro ao excluir agendamento' });
     }
   },
+
   async notificar(req, res) {
     try {
       const { id } = req.params;
@@ -170,8 +182,10 @@ module.exports = {
           prisma.notification.create({
             data: {
               userId: u.id,
-              agendamentoId: agendamento.id,
-              mensagem: `Lembrete manual: ${agendamento.titulo} em breve!`,
+              titulo: `Lembrete: ${agendamento.titulo}`,
+              mensagem: `Lembrete: ${agendamento.titulo} em breve!`,
+              tipo: 'LEMBRETE_AGENDAMENTO',
+              dados: { agendamentoId: agendamento.id },
               lida: false
             }
           })
@@ -180,8 +194,10 @@ module.exports = {
         notificados = [await prisma.notification.create({
           data: {
             userId: agendamento.criadoPorId,
-            agendamentoId: agendamento.id,
-            mensagem: `Lembrete manual: ${agendamento.titulo} em breve!`,
+            titulo: `Lembrete: ${agendamento.titulo}`,
+            mensagem: `Lembrete: ${agendamento.titulo} em breve!`,
+            tipo: 'LEMBRETE_AGENDAMENTO',
+            dados: { agendamentoId: agendamento.id },
             lida: false
           }
         })];

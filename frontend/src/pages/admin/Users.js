@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import axios from 'axios';
 import { AdminAuthContext } from '../../contexts/AdminAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { EyeIcon, BuildingOffice2Icon, EnvelopeIcon, PhoneIcon, UserIcon } from '@heroicons/react/24/outline';
+import Select from 'react-select';
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
@@ -19,11 +20,17 @@ function Users() {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId: '' });
+  const [form, setForm] = useState({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId: '', trabalharTodosEventos: false, eventosIds: [] });
   const [editId, setEditId] = useState(null);
   const [empresaId, setEmpresaId] = useState('');
   const [detailModal, setDetailModal] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
+  const [eventos, setEventos] = useState([]);
+  const [eventosLoading, setEventosLoading] = useState(false);
+  const [codigoEmpresa, setCodigoEmpresa] = useState('');
+  const [nomeEmpresa, setNomeEmpresa] = useState('');
+  const [codigoEmpresaError, setCodigoEmpresaError] = useState('');
+  const codigoEmpresaTimeout = useRef(null);
 
   useEffect(() => {
     if (!admin || admin.nivel !== 'MASTER') {
@@ -52,6 +59,20 @@ function Users() {
     setLoading(false);
   };
 
+  const fetchEventos = async (eid) => {
+    setEventosLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/events/empresa`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEventos(res.data);
+    } catch (err) {
+      setEventos([]);
+    }
+    setEventosLoading(false);
+  };
+
   const handleEdit = (user) => {
     setForm({
       nome: user.name,
@@ -59,9 +80,49 @@ function Users() {
       telefone: user.telefone || '',
       nivel: user.nivel,
       empresaId: user.empresaId,
+      trabalharTodosEventos: user.trabalharTodosEventos || false,
+      eventosIds: user.eventosIds || [],
     });
     setEditId(user.id);
     setModal(true);
+    fetchEventos(user.empresaId);
+  };
+
+  const handleCodigoEmpresaChange = (e) => {
+    const value = e.target.value;
+    setCodigoEmpresa(value);
+    setCodigoEmpresaError('');
+    if (!value) {
+      setNomeEmpresa('');
+      setForm(f => ({ ...f, empresaId: '' }));
+      return;
+    }
+    setNomeEmpresa('');
+    setForm(f => ({ ...f, empresaId: '' }));
+    if (codigoEmpresaTimeout.current) clearTimeout(codigoEmpresaTimeout.current);
+    if (value.length < 4) return;
+    codigoEmpresaTimeout.current = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/empresa-codigo/${value}`);
+        setNomeEmpresa(res.data.nome);
+        setForm(f => ({ ...f, empresaId: res.data.id }));
+        setCodigoEmpresaError('');
+      } catch (err) {
+        setNomeEmpresa('');
+        setForm(f => ({ ...f, empresaId: '' }));
+        setCodigoEmpresaError('Código de empresa inválido ou não encontrado');
+      }
+    }, 600);
+  };
+
+  const handleNew = () => {
+    setForm({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId: '', trabalharTodosEventos: false, eventosIds: [] });
+    setEditId(null);
+    setModal(true);
+    setCodigoEmpresa('');
+    setNomeEmpresa('');
+    setCodigoEmpresaError('');
+    setEventos([]);
   };
 
   const handleBlock = async (user) => {
@@ -93,20 +154,32 @@ function Users() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!codigoEmpresa && !nomeEmpresa) {
+      setCodigoEmpresaError('Informe o nome da empresa!');
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
+      const payload = {
+        ...form,
+        empresaId,
+        nomeEmpresa: nomeEmpresa,
+        codigoEmpresa: codigoEmpresa || undefined,
+        eventosIds: form.trabalharTodosEventos ? [] : form.eventosIds,
+        trabalharTodosEventos: !!form.trabalharTodosEventos,
+      };
       if (editId) {
-        await axios.put(`${API_URL}/users/${editId}`, { ...form, empresaId }, {
+        await axios.put(`${API_URL}/users/${editId}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post(`${API_URL}/users`, { ...form, empresaId }, {
+        await axios.post(`${API_URL}/users`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
       setModal(false);
       setEditId(null);
-      setForm({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId });
+      setForm({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId, trabalharTodosEventos: false, eventosIds: [] });
       fetchUsuarios(empresaId);
     } catch (err) {
       alert('Erro ao salvar usuário');
@@ -131,7 +204,7 @@ function Users() {
     <AdminLayout>
       <div className="p-6">
         <h2 className="text-2xl font-bold mb-4">Gerenciamento de Usuários</h2>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded mb-4" onClick={() => { setModal(true); setEditId(null); setForm({ nome: '', email: '', telefone: '', nivel: 'CHECKIN', empresaId }); }}>Novo Usuário</button>
+        <button className="bg-blue-600 text-white px-4 py-2 rounded mb-4" onClick={handleNew}>Novo Usuário</button>
         {loading ? <p>Carregando...</p> : (
           <table className="min-w-full bg-white border">
             <thead>
@@ -212,6 +285,15 @@ function Users() {
             <form className="bg-white p-6 rounded shadow-md w-96" onSubmit={handleSubmit}>
               <h3 className="text-lg font-bold mb-2">{editId ? 'Editar Usuário' : 'Novo Usuário'}</h3>
               <div className="mb-2">
+                <label className="block">Código da Empresa <span className="text-xs text-gray-400">(opcional)</span></label>
+                <input className="border w-full px-2 py-1" value={codigoEmpresa} onChange={handleCodigoEmpresaChange} disabled={!!editId} />
+                {codigoEmpresaError && <p className="text-red-600 text-xs mt-1">{codigoEmpresaError}</p>}
+              </div>
+              <div className="mb-2">
+                <label className="block">Nome da Empresa</label>
+                <input className="border w-full px-2 py-1 bg-gray-100" value={nomeEmpresa} onChange={e => { if (!codigoEmpresa) { setNomeEmpresa(e.target.value); } }} required={!codigoEmpresa} disabled={!!codigoEmpresa} />
+              </div>
+              <div className="mb-2">
                 <label className="block">Nome</label>
                 <input className="border w-full px-2 py-1" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
               </div>
@@ -228,6 +310,24 @@ function Users() {
                 <select className="border w-full px-2 py-1" value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })}>
                   {niveis.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
                 </select>
+              </div>
+              <div className="mb-2">
+                <label className="block font-medium">Permissões de Eventos</label>
+                <div className="flex items-center mb-2">
+                  <input type="checkbox" id="todosEventos" checked={form.trabalharTodosEventos} onChange={e => setForm({ ...form, trabalharTodosEventos: e.target.checked })} />
+                  <label htmlFor="todosEventos" className="ml-2">Trabalhar em todos os eventos da empresa</label>
+                </div>
+                <div className="mb-2">
+                  <label className="block text-sm">Selecionar eventos específicos:</label>
+                  <Select
+                    isMulti
+                    isDisabled={form.trabalharTodosEventos || eventosLoading}
+                    options={eventos.map(ev => ({ value: ev.id, label: ev.name }))}
+                    value={eventos.filter(ev => form.eventosIds?.includes(ev.id)).map(ev => ({ value: ev.id, label: ev.name }))}
+                    onChange={selected => setForm({ ...form, eventosIds: selected.map(opt => opt.value) })}
+                    placeholder={eventosLoading ? 'Carregando eventos...' : 'Selecione os eventos'}
+                  />
+                </div>
               </div>
               <div className="flex justify-end space-x-2 mt-4">
                 <button type="button" className="px-4 py-2 bg-gray-300 rounded" onClick={() => { setModal(false); setEditId(null); }}>Cancelar</button>

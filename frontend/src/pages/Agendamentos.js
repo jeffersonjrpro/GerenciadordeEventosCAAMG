@@ -91,16 +91,14 @@ export default function Agendamentos() {
   const handleExcluir = async () => {
     if (!agendamentoSelecionado) return;
     
-    if (window.confirm('Tem certeza que deseja excluir este agendamento?')) {
-      try {
-        setError('');
-        await deleteAgendamento(agendamentoSelecionado.id);
-        setModalOpen(false);
-        await carregarAgendamentos();
-      } catch (err) {
-        console.error('Erro ao excluir agendamento:', err);
-        setError('Erro ao excluir agendamento');
-      }
+    try {
+      setError('');
+      await deleteAgendamento(agendamentoSelecionado.id);
+      setModalOpen(false);
+      await carregarAgendamentos();
+    } catch (err) {
+      console.error('Erro ao excluir agendamento:', err);
+      setError('Erro ao excluir agendamento');
     }
   };
 

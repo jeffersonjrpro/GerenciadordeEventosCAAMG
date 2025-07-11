@@ -18,6 +18,13 @@ exports.listEmpresas = async (userId, isMaster = false) => {
           email: true,
         },
       },
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       _count: {
         select: {
           usuarios: true,
@@ -30,6 +37,11 @@ exports.listEmpresas = async (userId, isMaster = false) => {
     },
   });
 };
+
+// Função utilitária para gerar código único
+function generateEmpresaCodigo() {
+  return Math.random().toString(36).substring(2, 10);
+}
 
 exports.createEmpresa = async (data, userId, isMaster = false) => {
   return await prisma.empresa.create({
@@ -44,6 +56,8 @@ exports.createEmpresa = async (data, userId, isMaster = false) => {
       status: data.status || 'ATIVA',
       planoId: data.planoId,
       createdById: isMaster ? data.createdById : userId,
+      ownerId: isMaster ? data.createdById : userId, // Definir o criador como proprietário
+      codigo: generateEmpresaCodigo(), // Gera código único
     },
     include: {
       plano: {
@@ -53,6 +67,13 @@ exports.createEmpresa = async (data, userId, isMaster = false) => {
         },
       },
       createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      owner: {
         select: {
           id: true,
           name: true,
@@ -84,6 +105,13 @@ exports.updateEmpresa = async (id, data) => {
           preco: true,
         },
       },
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 };
@@ -110,6 +138,13 @@ exports.blockEmpresa = async (id) => {
         select: {
           nome: true,
           preco: true,
+        },
+      },
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
         },
       },
     },
@@ -160,6 +195,13 @@ exports.getEmpresa = async (id) => {
           criadoEm: 'desc',
         },
       },
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 };
@@ -188,5 +230,21 @@ exports.deleteEmpresa = async (id) => {
 
   return await prisma.empresa.delete({
     where: { id }
+  });
+};
+
+exports.getEmpresaByCodigo = async (codigo) => {
+  // Busca a empresa diretamente pelo campo 'codigo'
+  return await prisma.empresa.findUnique({
+    where: { codigo },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 }; 

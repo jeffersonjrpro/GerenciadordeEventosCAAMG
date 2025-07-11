@@ -6,7 +6,6 @@ import {
   Save, 
   Eye, 
   Copy, 
-  Palette,
   Type,
   Image,
   Calendar,
@@ -14,20 +13,229 @@ import {
   User,
   Settings,
   Upload,
-  Trash2,
-  X
+  X,
+  CheckCircle,
+  AlertTriangle,
+  Users
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import api from '../services/api';
+import { Link } from 'react-router-dom';
+
+// Adicionar PreviewCountdown no topo do arquivo
+function PreviewCountdown({ tipo }) {
+  // Simula um tempo qualquer
+  const timeLeft = { days: 7, hours: 16, minutes: 56, seconds: 19 };
+  if (tipo === 'none') return null;
+  if (tipo === 'minimal') {
+    return (
+      <div className="text-center py-2">
+        <h3 className="text-lg font-semibold text-gray-700 mb-1">Contagem Regressiva</h3>
+        <div className="flex justify-center space-x-2">
+          <div className="text-center">
+            <div className="bg-gray-200 text-gray-900 text-xl font-bold rounded px-3 py-1 min-w-[48px]">{timeLeft.days}</div>
+            <div className="text-xs mt-1">Dias</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-gray-200 text-gray-900 text-xl font-bold rounded px-3 py-1 min-w-[48px]">{timeLeft.hours}</div>
+            <div className="text-xs mt-1">Horas</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-gray-200 text-gray-900 text-xl font-bold rounded px-3 py-1 min-w-[48px]">{timeLeft.minutes}</div>
+            <div className="text-xs mt-1">Min</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-gray-200 text-gray-900 text-xl font-bold rounded px-3 py-1 min-w-[48px]">{timeLeft.seconds}</div>
+            <div className="text-xs mt-1">Seg</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (tipo === 'modern') {
+    return (
+      <div className="text-center py-4">
+        <h3 className="text-xl font-bold text-blue-700 mb-2">Contagem Regressiva</h3>
+        <div className="flex justify-center space-x-2">
+          <div className="text-center">
+            <div className="bg-blue-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px] shadow-lg">{String(timeLeft.days).padStart(2, '0')}</div>
+            <div className="text-blue-700 text-xs mt-1">Dias</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-blue-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px] shadow-lg">{String(timeLeft.hours).padStart(2, '0')}</div>
+            <div className="text-blue-700 text-xs mt-1">Horas</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-blue-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px] shadow-lg">{String(timeLeft.minutes).padStart(2, '0')}</div>
+            <div className="text-blue-700 text-xs mt-1">Min</div>
+          </div>
+          <div className="text-center">
+            <div className="bg-blue-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px] shadow-lg">{String(timeLeft.seconds).padStart(2, '0')}</div>
+            <div className="text-blue-700 text-xs mt-1">Seg</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // NOVOS ESTILOS
+  if (tipo === 'neon-circular') {
+    // Circular Pontilhado Neon
+    const circle = (value, total, label) => {
+      const dots = [];
+      for (let i = 0; i < total; i++) {
+        dots.push(
+          <span
+            key={i}
+            className={`inline-block w-2 h-2 rounded-full mx-[1.5px] my-0 ${i < value ? 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]' : 'bg-gray-700'}`}
+          />
+        );
+      }
+      return (
+        <div className="flex flex-col items-center mx-2">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute flex flex-wrap w-14 h-14 items-center justify-center" style={{transform: 'rotate(-90deg)'}}>
+              {dots}
+            </div>
+            <div className="relative z-10 text-3xl font-extrabold text-white drop-shadow-[0_0_8px_cyan] min-w-[44px] text-center">{String(value).padStart(2, '0')}</div>
+          </div>
+          <div className="text-xs text-cyan-300 mt-1 uppercase tracking-widest">{label}</div>
+        </div>
+      );
+    };
+    return (
+      <div className="bg-black rounded-xl py-4 px-2">
+        <div className="flex justify-center gap-4">
+          {circle(timeLeft.days, 30, 'Dias')}
+          {circle(timeLeft.hours, 24, 'Horas')}
+          {circle(timeLeft.minutes, 60, 'Min')}
+          {circle(timeLeft.seconds, 60, 'Seg')}
+        </div>
+      </div>
+    );
+  }
+  if (tipo === 'flip-card') {
+    // Flip Card (Cartão Virando)
+    const card = (value, label) => (
+      <div className="flex flex-col items-center mx-2">
+        <div className="bg-gradient-to-b from-gray-800 to-gray-900 text-white text-4xl font-extrabold rounded-xl w-16 h-20 flex items-center justify-center shadow-lg relative border-b-4 border-gray-700">
+          <div className="absolute top-1/2 left-0 w-full border-t border-gray-600 opacity-60"></div>
+          <span className="z-10">{String(value).padStart(2, '0')}</span>
+        </div>
+        <div className="text-xs text-yellow-400 mt-1 uppercase tracking-widest">{label}</div>
+      </div>
+    );
+    return (
+      <div className="bg-gradient-to-b from-gray-900 to-black rounded-xl py-4 px-2">
+        <div className="flex justify-center gap-4">
+          {card(timeLeft.days, 'Dias')}
+          {card(timeLeft.hours, 'Horas')}
+          {card(timeLeft.minutes, 'Min')}
+          {card(timeLeft.seconds, 'Seg')}
+        </div>
+      </div>
+    );
+  }
+  if (tipo === 'progress-circular') {
+    // Circular Progressivo Colorido
+    const progressCircle = (value, max, label, color) => {
+      const percent = (value / max) * 100;
+      return (
+        <div className="flex flex-col items-center mx-2">
+          <div className="relative w-16 h-16 flex items-center justify-center">
+            <svg className="absolute top-0 left-0" width="64" height="64">
+              <circle cx="32" cy="32" r="28" stroke="#222" strokeWidth="6" fill="none" />
+              <circle
+                cx="32" cy="32" r="28"
+                stroke={color}
+                strokeWidth="6"
+                fill="none"
+                strokeDasharray={2 * Math.PI * 28}
+                strokeDashoffset={2 * Math.PI * 28 * (1 - percent / 100)}
+                strokeLinecap="round"
+                style={{transition: 'stroke-dashoffset 0.5s'}}
+              />
+            </svg>
+            <span className="relative z-10 text-2xl font-bold text-white">{String(value).padStart(2, '0')}</span>
+          </div>
+          <div className="text-xs text-blue-300 mt-1 uppercase tracking-widest">{label}</div>
+        </div>
+      );
+    };
+    return (
+      <div className="bg-gradient-to-b from-blue-950 to-black rounded-xl py-4 px-2">
+        <div className="flex justify-center gap-4">
+          {progressCircle(timeLeft.days, 30, 'Dias', 'url(#grad1)')}
+          {progressCircle(timeLeft.hours, 24, 'Horas', '#38bdf8')}
+          {progressCircle(timeLeft.minutes, 60, 'Min', '#22d3ee')}
+          {progressCircle(timeLeft.seconds, 60, 'Seg', '#4ade80')}
+          <svg width="0" height="0">
+            <defs>
+              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#38bdf8" />
+                <stop offset="100%" stopColor="#4ade80" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    );
+  }
+  if (tipo === 'digital-glow') {
+    // Digital com Glow
+    const digital = (value, label) => (
+      <div className="flex flex-col items-center mx-2">
+        <div className="bg-black text-cyan-400 text-4xl font-mono font-extrabold rounded-lg w-16 h-20 flex items-center justify-center shadow-[0_0_16px_#22d3ee] border-2 border-cyan-400">
+          <span className="drop-shadow-[0_0_8px_cyan]">{String(value).padStart(2, '0')}</span>
+        </div>
+        <div className="text-xs text-cyan-200 mt-1 uppercase tracking-widest">{label}</div>
+      </div>
+    );
+    return (
+      <div className="bg-gradient-to-b from-gray-900 to-black rounded-xl py-4 px-2">
+        <div className="flex justify-center gap-4">
+          {digital(timeLeft.days, 'Dias')}
+          {digital(timeLeft.hours, 'Horas')}
+          {digital(timeLeft.minutes, 'Min')}
+          {digital(timeLeft.seconds, 'Seg')}
+        </div>
+      </div>
+    );
+  }
+  // padrão épico
+  return (
+    <div className="text-center py-4">
+      <h3 className="text-xl font-bold text-white mb-2 bg-gradient-to-r from-red-900 via-red-800 to-black rounded-t-lg">Contagem Regressiva</h3>
+      <div className="flex justify-center space-x-2">
+        <div className="text-center">
+          <div className="bg-red-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px]">{String(timeLeft.days).padStart(2, '0')}</div>
+          <div className="text-white text-xs mt-1">Dias</div>
+        </div>
+        <div className="text-center">
+          <div className="bg-red-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px]">{String(timeLeft.hours).padStart(2, '0')}</div>
+          <div className="text-white text-xs mt-1">Horas</div>
+        </div>
+        <div className="text-center">
+          <div className="bg-red-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px]">{String(timeLeft.minutes).padStart(2, '0')}</div>
+          <div className="text-white text-xs mt-1">Min</div>
+        </div>
+        <div className="text-center">
+          <div className="bg-red-600 text-white text-2xl font-bold rounded-lg px-3 py-1 min-w-[56px]">{String(timeLeft.seconds).padStart(2, '0')}</div>
+          <div className="text-white text-xs mt-1">Seg</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PublicPageEditor = ({ eventId, onSave }) => {
   const [config, setConfig] = useState({
-    layout: 'modern',
+    tema: 'modern',
     theme: {
       primaryColor: '#3B82F6',
       secondaryColor: '#1E40AF',
       backgroundColor: '#FFFFFF',
-      textColor: '#1F2937'
+      textColor: '#1F2937',
+      buttonColor: '#3B82F6',
     },
     header: {
       title: '',
@@ -52,7 +260,9 @@ const PublicPageEditor = ({ eventId, onSave }) => {
     footer: {
       showSocialLinks: false,
       customText: '© 2024 Sistema de Eventos'
-    }
+    },
+    palestrantes: [],
+    countdownType: 'epic' // Adicionado para controlar o tipo de contador
   });
   const [activeTab, setActiveTab] = useState('editor');
   const [loading, setLoading] = useState(true);
@@ -62,6 +272,23 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   const [autoSaving, setAutoSaving] = useState(false);
   const autoSaveTimeout = useRef(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  
+  // Estados para modal de confirmação de salvamento
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Estado para popup de sucesso
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Estado para popup de erro
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Estados para seletores de cores
+  const [activeColorPicker, setActiveColorPicker] = useState(null);
+  const [colorPickerPosition, setColorPickerPosition] = useState({ x: 0, y: 0 });
   
   // State for the main event description
   const [description, setDescription] = useState('');
@@ -88,27 +315,34 @@ const PublicPageEditor = ({ eventId, onSave }) => {
     'link', 'image'
   ];
 
-  useEffect(() => {
-    loadPageConfig();
-  }, [eventId]);
-
-  const loadPageConfig = async () => {
+  const loadPageConfig = useCallback(async () => {
     try {
+      console.log('🔍 loadPageConfig - Iniciando carregamento da configuração da página');
       const response = await api.get(`/events/${eventId}/public-page-config`);
       
+      console.log('✅ loadPageConfig - Configuração da página carregada:', response.data);
+      
       if (response.data) {
-        setConfig(response.data.data);
+        const loadedConfig = response.data.data;
+        console.log('🔍 loadPageConfig - loadedConfig.tema:', loadedConfig.tema);
+        console.log('🔍 loadPageConfig - loadedConfig completo:', loadedConfig);
+        
+        setConfig(loadedConfig);
         
         // Also load event data for reference
+        console.log('🔍 loadPageConfig - Carregando dados do evento');
         const eventResponse = await api.get(`/events/${eventId}`);
+        
+        console.log('✅ loadPageConfig - Dados do evento carregados:', eventResponse.data);
         
         if (eventResponse.data) {
           const eventData = eventResponse.data.data;
           setEventData(eventData);
+          console.log('🔍 loadPageConfig - Descrição do evento:', eventData.description);
           setDescription(eventData.description || '');
           
           // Sincronizar a imagem do evento com a configuração da página
-          if (eventData.imageUrl && !response.data.data.header.imageUrl) {
+          if (eventData.imageUrl && !loadedConfig.header.imageUrl) {
             setConfig(prev => ({
               ...prev,
               header: {
@@ -120,43 +354,64 @@ const PublicPageEditor = ({ eventId, onSave }) => {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar configuração da página:', error);
+      console.error('❌ loadPageConfig - Erro ao carregar configuração da página:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
 
-  // Debounced function to save the description
+  useEffect(() => {
+    loadPageConfig();
+  }, [loadPageConfig]);
+
+  // Debug: logar mudanças na configuração
+  useEffect(() => {
+    console.log('🔍 config mudou - tema:', config.tema);
+    console.log('🔍 config completa:', config);
+  }, [config]);
+
   const saveDescription = useCallback(async (newDescription) => {
+    console.log('🔍 saveDescription - Iniciando salvamento da descrição');
+    console.log('🔍 saveDescription - newDescription:', newDescription);
+    console.log('🔍 saveDescription - eventId:', eventId);
+    console.log('🔍 saveDescription - Tamanho da descrição:', newDescription?.length || 0);
     setIsDescriptionSaving(true);
     try {
-      const response = await api.put(`/events/${eventId}`, {
+      const requestData = {
         description: newDescription
-      });
+      };
+      console.log('🔍 saveDescription - Dados da requisição:', requestData);
+      
+      const response = await api.put(`/events/${eventId}`, requestData);
+
+      console.log('✅ saveDescription - Resposta da API:', response.data);
+      console.log('✅ saveDescription - Status da resposta:', response.status);
 
       if (response.data) {
-        // Optionally update local event data
+        // Atualizar o estado local do eventData
         setEventData(prev => ({
           ...prev,
-          data: {
-            ...prev.data,
             description: newDescription
-          }
         }));
+        console.log('✅ saveDescription - Estado local atualizado');
       }
 
     } catch (error) {
-      console.error('Erro ao salvar descrição:', error);
-      alert('Não foi possível salvar a descrição.');
+      console.error('❌ saveDescription - Erro ao salvar descrição:', error);
+      console.error('❌ saveDescription - error.response:', error.response);
+      console.error('❌ saveDescription - error.message:', error.message);
+      showErrorMessage('Não foi possível salvar a descrição.');
     } finally {
       setIsDescriptionSaving(false);
     }
   }, [eventId]);
 
   const handleDescriptionChange = (content) => {
+    console.log('🔍 handleDescriptionChange - Conteúdo recebido:', content);
     setDescription(content);
     if (descriptionSaveTimeout.current) clearTimeout(descriptionSaveTimeout.current);
     descriptionSaveTimeout.current = setTimeout(() => {
+      console.log('🔍 handleDescriptionChange - Executando saveDescription após debounce');
       saveDescription(content);
     }, 1500); // 1.5-second debounce
   };
@@ -167,13 +422,13 @@ const PublicPageEditor = ({ eventId, onSave }) => {
 
     // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione apenas arquivos de imagem.');
+      showErrorMessage('Por favor, selecione apenas arquivos de imagem.');
       return;
     }
 
     // Validar tamanho (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB.');
+      showErrorMessage('A imagem deve ter no máximo 5MB.');
       return;
     }
 
@@ -212,11 +467,11 @@ const PublicPageEditor = ({ eventId, onSave }) => {
         // Salvar automaticamente a configuração da página
         await savePageConfig(updatedConfig);
 
-        alert('Imagem atualizada com sucesso!');
+        showSuccessMessage('Imagem atualizada com sucesso!');
       }
     } catch (error) {
       console.error('Erro ao fazer upload da imagem:', error);
-      alert('Erro ao fazer upload da imagem');
+      showErrorMessage('Erro ao fazer upload da imagem');
     } finally {
       setUploadingImage(false);
     }
@@ -251,59 +506,79 @@ const PublicPageEditor = ({ eventId, onSave }) => {
       await savePageConfig(updatedConfig);
 
       setIsConfirmModalOpen(false);
-      alert('Imagem removida com sucesso!');
+      showSuccessMessage('Imagem removida com sucesso!');
     } catch (error) {
       console.error('Erro ao remover imagem:', error);
-      alert('Erro ao remover imagem');
+      showErrorMessage('Erro ao remover imagem');
     } finally {
       setRemovingImage(false);
     }
   };
 
   const savePageConfig = async (configToSave) => {
+    console.log('🔍 savePageConfig - Iniciando salvamento');
+    console.log('🔍 savePageConfig - configToSave:', configToSave);
+    console.log('🔍 savePageConfig - configToSave.tema:', configToSave.tema);
+    
     setAutoSaving(true);
     try {
       const response = await api.put(`/events/${eventId}/public-page-config`, configToSave);
 
       if (response.data) {
         if (onSave) onSave(configToSave);
-        console.log('Configuração da página salva automaticamente');
+        console.log('✅ savePageConfig - Configuração da página salva automaticamente');
       }
     } catch (error) {
-      console.error('Erro ao salvar configuração da página:', error);
+      console.error('❌ savePageConfig - Erro ao salvar configuração da página:', error);
     } finally {
       setAutoSaving(false);
     }
   };
 
   const getImageUrl = () => {
-    // Priorizar a imagem da configuração da página, depois a do evento
-    const imageUrl = config.header.imageUrl || eventData?.data?.imageUrl;
+    const imageUrl = config.header.imageUrl || eventData?.imageUrl;
     if (!imageUrl) return null;
-    
-    // Se já é uma URL completa, retornar como está
-    if (imageUrl.startsWith('http')) {
-      return imageUrl;
-    }
-    
-    // Se é um caminho relativo, construir a URL completa
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    if (imageUrl.startsWith('http')) return imageUrl;
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     // Garantir que o caminho comece com /uploads/
     const normalizedPath = imageUrl.startsWith('/uploads/') ? imageUrl : `/uploads/${imageUrl}`;
+    console.log('🔍 getImageUrl - imageUrl:', imageUrl);
+    console.log('🔍 getImageUrl - normalizedPath:', normalizedPath);
+    console.log('🔍 getImageUrl - baseUrl:', baseUrl);
+    console.log('🔍 getImageUrl - final URL:', `${baseUrl}${normalizedPath}`);
     return `${baseUrl}${normalizedPath}`;
   };
 
+  // Função para ajustar o brilho de uma cor
+  const adjustBrightness = (hex, percent) => {
+    const num = parseInt(hex.replace("#", ""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = ((num >> 8) & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+  };
+
   const handleSave = async () => {
+    setSaving(true);
     try {
       const response = await api.put(`/events/${eventId}/public-page-config`, config);
 
       if (response.data) {
         if (onSave) onSave(config);
-        alert('Página salva com sucesso!');
+        setSaveSuccess(true);
+        setTimeout(() => {
+          setShowSaveConfirmModal(false);
+          setSaveSuccess(false);
+        }, 2000);
       }
     } catch (error) {
       console.error('Erro ao salvar página:', error);
-      alert('Erro ao salvar página');
+      setSaveSuccess(false);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -314,14 +589,29 @@ const PublicPageEditor = ({ eventId, onSave }) => {
 
   const copyEmbedCode = () => {
     navigator.clipboard.writeText(generateEmbedCode());
-    alert('Código de incorporação copiado!');
+    showSuccessMessage('Código de incorporação copiado!');
   };
 
   const updateConfig = (section, updates, debounce = 500) => {
-    const newConfig = {
+    let newConfig;
+    
+    // Se updates for uma string (como no caso do layout), atualizar diretamente
+    if (typeof updates === 'string') {
+      newConfig = {
+        ...config,
+        [section]: updates
+      };
+    } else {
+      // Se updates for um objeto, mesclar com a seção existente
+      newConfig = {
       ...config,
       [section]: { ...config[section], ...updates }
     };
+    }
+    
+    console.log('🔍 updateConfig - section:', section);
+    console.log('🔍 updateConfig - updates:', updates);
+    console.log('🔍 updateConfig - newConfig:', newConfig);
     
     setConfig(newConfig);
     
@@ -339,6 +629,33 @@ const PublicPageEditor = ({ eventId, onSave }) => {
     }));
   };
 
+  // Funções para o seletor de cores
+  const closeColorPicker = () => {
+    setActiveColorPicker(null);
+  };
+
+  const updateColor = (colorKey, color) => {
+    updateTheme({ [colorKey]: color });
+  };
+
+  // Função para mostrar popup de sucesso
+  const showSuccessMessage = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessPopup(true);
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 3000);
+  };
+
+  // Função para mostrar popup de erro
+  const showErrorMessage = (message) => {
+    setErrorMessage(message);
+    setShowErrorPopup(true);
+    setTimeout(() => {
+      setShowErrorPopup(false);
+    }, 4000);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -348,10 +665,77 @@ const PublicPageEditor = ({ eventId, onSave }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div 
+      style={{
+        '--primary-color': config.theme?.primaryColor || '#3B82F6',
+        '--secondary-color': config.theme?.secondaryColor || '#1E40AF',
+        '--background-color': config.theme?.backgroundColor || '#FFFFFF',
+        '--text-color': config.theme?.textColor || '#1F2937',
+        '--button-color': config.theme?.buttonColor || '#3B82F6',
+      }} 
+      className="min-h-screen bg-gray-50"
+    >
+      
+      <style>
+        {`
+          .btn-primary {
+            background-color: var(--button-color) !important;
+            border-color: var(--button-color) !important;
+          }
+          .btn-primary:hover {
+            background-color: ${config.theme?.buttonColor ? 
+              adjustBrightness(config.theme.buttonColor, -20) : '#2563EB'} !important;
+          }
+          .text-primary {
+            color: var(--primary-color) !important;
+          }
+          .bg-primary {
+            background-color: var(--primary-color) !important;
+          }
+          .border-primary {
+            border-color: var(--primary-color) !important;
+          }
+          .bg-secondary {
+            background-color: var(--secondary-color) !important;
+          }
+          .text-secondary {
+            color: var(--secondary-color) !important;
+          }
+          .bg-custom-background {
+            background-color: var(--background-color) !important;
+          }
+          .text-custom-text {
+            color: var(--text-color) !important;
+          }
+          .header-bg {
+            background-color: var(--primary-color) !important;
+          }
+          .header-text {
+            color: var(--text-color) !important;
+          }
+          .card-bg {
+            background-color: var(--background-color) !important;
+          }
+          .card-text {
+            color: var(--text-color) !important;
+          }
+        `}
+      </style>
       {/* Header */}
       <div className="flex items-center justify-end">
         <div className="flex space-x-3">
+          <button
+            className="inline-flex items-center px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            onClick={() => {
+              const base = window.location.origin;
+              const customSlug = eventData?.customSlug;
+              const url = customSlug ? `${base}/e/${customSlug}` : `${base}/event/${eventId}`;
+              window.open(url, '_blank');
+            }}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Visualizar Página Pública
+          </button>
           <button
             onClick={copyEmbedCode}
             className="btn-outline inline-flex items-center"
@@ -360,8 +744,8 @@ const PublicPageEditor = ({ eventId, onSave }) => {
             Copiar Embed
           </button>
           <button
-            onClick={handleSave}
-            className="btn-primary inline-flex items-center"
+            onClick={() => setShowSaveConfirmModal(true)}
+            className="inline-flex items-center px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Save className="h-4 w-4 mr-2" />
             Salvar Página
@@ -370,7 +754,7 @@ const PublicPageEditor = ({ eventId, onSave }) => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 flex items-center justify-between">
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('editor')}
@@ -402,6 +786,144 @@ const PublicPageEditor = ({ eventId, onSave }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Layout Settings */}
+            <div className="card">
+              <div className="card-header">
+                <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                  <Settings className="h-5 w-5 mr-2" />
+                  Tema da Página
+                </h3>
+              </div>
+              <div className="card-body space-y-4">
+                <div>
+                  <label className="form-label">Estilo do Tema</label>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-2">
+                    {/* Tema Moderno 1 */}
+                    <div 
+                      className={`border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                        config.tema === 'modern' 
+                          ? 'border-blue-700 bg-blue-50 ring-2 ring-blue-200 shadow-lg' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => updateConfig('tema', 'modern')}
+                    >
+                      <div className="text-center">
+                        <div className="w-full h-20 bg-gradient-to-r from-blue-600 to-black rounded-2xl mb-2"></div>
+                        <h4 className="font-semibold text-sm">Moderno Azul</h4>
+                        <p className="text-xs text-gray-500 mt-1">Gradiente azul e preto, design atual</p>
+                        {config.tema === 'modern' && (
+                          <div className="mt-2 text-blue-700 text-xs font-medium">✓ Selecionado</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Tema Moderno 2 - Preto, Azul Marinho, Vermelho Escuro */}
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                        config.tema === 'modern-dark' 
+                          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => updateConfig('tema', 'modern-dark')}
+                    >
+                      <div className="text-center">
+                        <div className="w-full h-20 bg-gradient-to-r from-black via-blue-900 to-red-900 rounded mb-2"></div>
+                        <h4 className="font-semibold text-sm">Moderno Escuro</h4>
+                        <p className="text-xs text-gray-500 mt-1">Preto, azul marinho e vermelho escuro</p>
+                        {config.tema === 'modern-dark' && (
+                          <div className="mt-2 text-primary-600 text-xs font-medium">✓ Selecionado</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Tema Evento Épico - Estilo Netflix */}
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                        config.tema === 'epic' 
+                          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => updateConfig('tema', 'epic')}
+                    >
+                      <div className="text-center">
+                        <div className="w-full h-20 bg-gradient-to-r from-red-600 via-red-800 to-black rounded mb-2 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                        </div>
+                        <h4 className="font-semibold text-sm">Evento Épico</h4>
+                        <p className="text-xs text-gray-500 mt-1">Estilo Netflix, palestrantes, countdown</p>
+                        {config.tema === 'epic' && (
+                          <div className="mt-2 text-primary-600 text-xs font-medium">✓ Selecionado</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Tema Clássico */}
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                        config.tema === 'classic' 
+                          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => updateConfig('tema', 'classic')}
+                    >
+                      <div className="text-center">
+                        <div className="w-full h-20 bg-gray-800 rounded mb-2"></div>
+                        <h4 className="font-semibold text-sm">Clássico</h4>
+                        <p className="text-xs text-gray-500 mt-1">Cabeçalho escuro tradicional</p>
+                        {config.tema === 'classic' && (
+                          <div className="mt-2 text-primary-600 text-xs font-medium">✓ Selecionado</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Tema Minimalista */}
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                        config.tema === 'minimal' 
+                          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => updateConfig('tema', 'minimal')}
+                    >
+                      <div className="text-center">
+                        <div className="w-full h-20 bg-white border border-gray-200 rounded mb-2"></div>
+                        <h4 className="font-semibold text-sm">Minimalista</h4>
+                        <p className="text-xs text-gray-500 mt-1">Limpo e minimalista</p>
+                        {config.tema === 'minimal' && (
+                          <div className="mt-2 text-primary-600 text-xs font-medium">✓ Selecionado</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Após o card de seleção de tema, antes do card de cabeçalho */}
+            <div className="card">
+              <div className="card-header flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex-1">
+                  <label className="form-label block mb-2">Tipo de Contador</label>
+                  <select
+                    className="input w-full max-w-xs"
+                    value={config.countdownType || 'epic'}
+                    onChange={e => updateConfig('countdownType', e.target.value)}
+                  >
+                    <option value="none">Sem contador</option>
+                    <option value="epic">Contador Épico</option>
+                    <option value="modern">Contador Moderno</option>
+                    <option value="minimal">Contador Minimalista</option>
+                    <option value="neon-circular">Circular Neon</option>
+                    <option value="flip-card">Cartão Flip</option>
+                    <option value="progress-circular">Circular Progressivo</option>
+                    <option value="digital-glow">Digital Glow</option>
+                  </select>
+                </div>
+                <div className="flex-1 flex justify-center md:justify-end">
+                  {/* Preview do contador */}
+                  <div className="w-full max-w-xs">
+                    <PreviewCountdown tipo={config.countdownType || 'epic'} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Header Settings */}
             <div className="card">
               <div className="card-header">
@@ -704,105 +1226,46 @@ const PublicPageEditor = ({ eventId, onSave }) => {
                     className="input"
                     placeholder="Ex: Preencha os dados abaixo para participar do evento"
                   />
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Theme Panel */}
-          <div className="space-y-6">
-            {/* Color Theme */}
+            {/* Palestrantes Section - Only for Epic Theme */}
+            {config.tema === 'epic' && (
             <div className="card">
               <div className="card-header">
                 <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                  <Palette className="h-5 w-5 mr-2" />
-                  Cores
+                    <Users className="h-5 w-5 mr-2" />
+                    Palestrantes do Evento
                 </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Gerencie os palestrantes do seu evento épico
+                  </p>
               </div>
-              <div className="card-body space-y-4">
-                <div>
-                  <label className="form-label">Cor Primária</label>
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className="w-8 h-8 rounded border cursor-pointer"
-                      style={{ backgroundColor: config.theme.primaryColor }}
-                      onClick={() => {
-                        const color = prompt('Digite a cor (hex):', config.theme.primaryColor);
-                        if (color) updateTheme({ primaryColor: color });
-                      }}
-                    ></div>
-                    <input
-                      type="text"
-                      value={config.theme.primaryColor}
-                      onChange={(e) => updateTheme({ primaryColor: e.target.value })}
-                      className="input flex-1"
-                      placeholder="#3B82F6"
-                    />
+                <div className="card-body">
+                  <div className="text-center py-8">
+                    <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Gerenciar Palestrantes
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-6">
+                      Adicione, edite e organize os palestrantes do seu evento
+                    </p>
+                    <Link
+                      to={`/events/${eventId}/palestrantes`}
+                      className="btn-primary inline-flex items-center"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Gerenciar Palestrantes
+                    </Link>
                   </div>
                 </div>
-                <div>
-                  <label className="form-label">Cor Secundária</label>
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className="w-8 h-8 rounded border cursor-pointer"
-                      style={{ backgroundColor: config.theme.secondaryColor }}
-                      onClick={() => {
-                        const color = prompt('Digite a cor (hex):', config.theme.secondaryColor);
-                        if (color) updateTheme({ secondaryColor: color });
-                      }}
-                    ></div>
-                    <input
-                      type="text"
-                      value={config.theme.secondaryColor}
-                      onChange={(e) => updateTheme({ secondaryColor: e.target.value })}
-                      className="input flex-1"
-                      placeholder="#1E40AF"
-                    />
                   </div>
-                </div>
-                <div>
-                  <label className="form-label">Cor de Fundo</label>
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className="w-8 h-8 rounded border cursor-pointer"
-                      style={{ backgroundColor: config.theme.backgroundColor }}
-                      onClick={() => {
-                        const color = prompt('Digite a cor (hex):', config.theme.backgroundColor);
-                        if (color) updateTheme({ backgroundColor: color });
-                      }}
-                    ></div>
-                    <input
-                      type="text"
-                      value={config.theme.backgroundColor}
-                      onChange={(e) => updateTheme({ backgroundColor: e.target.value })}
-                      className="input flex-1"
-                      placeholder="#FFFFFF"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="form-label">Cor do Texto</label>
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className="w-8 h-8 rounded border cursor-pointer"
-                      style={{ backgroundColor: config.theme.textColor }}
-                      onClick={() => {
-                        const color = prompt('Digite a cor (hex):', config.theme.textColor);
-                        if (color) updateTheme({ textColor: color });
-                      }}
-                    ></div>
-                    <input
-                      type="text"
-                      value={config.theme.textColor}
-                      onChange={(e) => updateTheme({ textColor: e.target.value })}
-                      className="input flex-1"
-                      placeholder="#1F2937"
-                    />
-                  </div>
-                </div>
-              </div>
+            )}
             </div>
 
+          {/* Theme Panel */}
+          <div className="space-y-6">
             {/* Embed Code */}
             <div className="card">
               <div className="card-header">
@@ -864,6 +1327,117 @@ const PublicPageEditor = ({ eventId, onSave }) => {
         message="Tem certeza que deseja remover a imagem do evento? Esta ação não pode ser desfeita."
         confirmText="Sim, Remover"
       />
+
+      {/* Modal de Confirmação de Salvamento */}
+      {showSaveConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-6 w-full max-w-md">
+            <div className="relative bg-white rounded-lg shadow-xl">
+              {/* Header */}
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-blue-100 rounded-full mb-4">
+                {saveSuccess ? (
+                  <CheckCircle className="h-6 w-6 text-blue-600" />
+                ) : (
+                  <AlertTriangle className="h-6 w-6 text-blue-600" />
+                )}
+              </div>
+              
+              {/* Content */}
+              <div className="text-center px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {saveSuccess ? 'Página Salva!' : 'Confirmar Salvamento'}
+                </h3>
+                <p className="text-sm text-gray-600 mb-6">
+                  {saveSuccess 
+                    ? 'As alterações foram salvas com sucesso!'
+                    : 'Tem certeza que deseja salvar as alterações da página?'
+                  }
+                </p>
+                
+                {/* Actions */}
+                <div className="flex justify-center space-x-3">
+                  {!saveSuccess && (
+                    <button
+                      onClick={() => setShowSaveConfirmModal(false)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  {!saveSuccess && (
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+                    >
+                      {saving ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seletor de Cores */}
+      {activeColorPicker && (
+        <div className="fixed inset-0 z-50" onClick={closeColorPicker}>
+          <div
+            className="absolute bg-white rounded-lg shadow-xl border p-3"
+            style={{
+              left: colorPickerPosition.x,
+              top: colorPickerPosition.y,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HexColorPicker
+              color={config.theme[activeColorPicker]}
+              onChange={(color) => updateColor(activeColorPicker, color)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Popup de Sucesso */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowSuccessPopup(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Sucesso!
+              </h3>
+              <p className="text-sm text-gray-600">
+                {successMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup de Erro */}
+      {showErrorPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowErrorPopup(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Erro!
+              </h3>
+              <p className="text-sm text-gray-600">
+                {errorMessage}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

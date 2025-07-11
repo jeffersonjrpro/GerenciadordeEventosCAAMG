@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Ticket
 } from 'lucide-react';
-import { QrReader } from 'react-qr-reader';
+import QrScanner from 'react-qr-scanner';
 
 const CheckIn = () => {
   const { eventId } = useParams();
@@ -25,11 +25,7 @@ const CheckIn = () => {
   const [manualCode, setManualCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchEventDetails();
-  }, [eventId]);
-
-  const fetchEventDetails = async () => {
+  const fetchEventDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/events/${eventId}`);
@@ -40,7 +36,11 @@ const CheckIn = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    fetchEventDetails();
+  }, [fetchEventDetails]);
 
   const handleScanResult = async (result) => {
     if (result && !isSubmitting) {
@@ -205,7 +205,7 @@ const CheckIn = () => {
                 {isScanning ? (
                   <div>
                     <div className="w-full max-w-sm mx-auto bg-gray-900 rounded-lg overflow-hidden border-4 border-gray-300 shadow-lg">
-                      <QrReader
+                      <QrScanner
                         onResult={handleScanResult}
                         constraints={{ facingMode: 'environment' }}
                         className="qr-reader-container"

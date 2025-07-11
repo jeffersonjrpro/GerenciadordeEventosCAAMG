@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import api from '../services/api';
-import { Calendar, MapPin, Clock, FileText, Save, ArrowLeft } from 'lucide-react';
+import { Calendar, MapPin, FileText, Save, ArrowLeft } from 'lucide-react';
 
 const CreateEvent = () => {
   const navigate = useNavigate();
@@ -16,8 +16,6 @@ const CreateEvent = () => {
     formState: { errors },
     watch,
   } = useForm();
-
-  const isActive = watch('isActive');
 
   const onSubmit = async (data) => {
     setLoading(true);

@@ -4,14 +4,16 @@
   "description": "Backend API para sistema de gerenciamento de eventos",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "set NODE_OPTIONS=--openssl-legacy-provider && node src/server.js",
+    "dev": "set NODE_OPTIONS=--openssl-legacy-provider && nodemon src/server.js",
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "studio": "prisma studio",
     "seed": "node src/seed.js",
     "build": "prisma generate",
-    "deploy": "npm run build && npm start"
+    "deploy": "npm run build && npm start",
+    "start:legacy": "set NODE_OPTIONS=--openssl-legacy-provider && node src/server.js",
+    "dev:legacy": "set NODE_OPTIONS=--openssl-legacy-provider && nodemon src/server.js"
   },
   "dependencies": {
     "@prisma/client": "^6.11.0",
@@ -31,9 +33,11 @@
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.0",
     "nodemailer": "^6.9.7",
     "pg": "^8.16.2",
     "qrcode": "^1.5.4",
+    "smb2": "^0.2.11",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

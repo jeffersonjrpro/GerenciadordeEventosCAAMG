@@ -25,10 +25,9 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           const response = await api.get('/auth/verify');
-          setUser(response.data.user);
+          setUser(response.data.data.user); // Corrigido para acessar o campo correto
         } catch (error) {
           console.error('Token inválido:', error);
-          // Não redirecionar automaticamente, apenas limpar o token
           setUser(null);
           setToken(null);
           localStorage.removeItem('token');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import EventTeam from '../components/EventTeam';
@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Share2,
   QrCode,
-  Mail,
   Download,
   Eye,
   UserPlus,
@@ -21,13 +20,13 @@ import {
   Pause,
   Play,
   BarChart3,
-  TrendingUp,
   Users2,
   UserCheck,
-  UserX,
   CalendarDays,
   Type,
-  Palette
+  Palette,
+  AlertTriangle,
+  User
 } from 'lucide-react';
 
 const EventDetails = () => {
@@ -45,14 +44,11 @@ const EventDetails = () => {
   const [pauseUntil, setPauseUntil] = useState('');
   const [registrationStatus, setRegistrationStatus] = useState({ isPaused: false });
 
-  useEffect(() => {
-    console.log('EventDetails - eventId recebido:', eventId);
-    fetchEventDetails();
-    fetchStats();
-    fetchRegistrationStatus();
-  }, [eventId]);
+  // Estados para modal de erro de permissão
+  const [showPermissionErrorModal, setShowPermissionErrorModal] = useState(false);
+  const [permissionError, setPermissionError] = useState(null);
 
-  const fetchEventDetails = async () => {
+  const fetchEventDetails = useCallback(async () => {
     try {
       setLoading(true);
       console.log('Fazendo requisição para:', `/events/${eventId}`);
@@ -71,25 +67,32 @@ const EventDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, navigate]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await api.get(`/events/${eventId}/stats`);
       setStats(response.data.data);
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
     }
-  };
+  }, [eventId]);
 
-  const fetchRegistrationStatus = async () => {
+  const fetchRegistrationStatus = useCallback(async () => {
     try {
       const response = await api.get(`/events/${eventId}/registration-status`);
       setRegistrationStatus(response.data.data);
     } catch (error) {
       console.error('Erro ao buscar status das inscrições:', error);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    console.log('EventDetails - eventId recebido:', eventId);
+    fetchEventDetails();
+    fetchStats();
+    fetchRegistrationStatus();
+  }, [fetchEventDetails, fetchStats, fetchRegistrationStatus]);
 
   const handleDeleteEvent = async () => {
     try {
@@ -98,6 +101,21 @@ const EventDetails = () => {
       navigate('/events');
     } catch (error) {
       console.error('Erro ao deletar evento:', error);
+      
+      // Verificar se é erro de permissão
+      if (error.response && error.response.status === 403) {
+        const errorData = error.response.data;
+        setPermissionError({
+          eventName: errorData.eventName || event?.name,
+          eventOwner: errorData.eventOwner,
+          message: errorData.message || 'Apenas o criador do evento pode excluí-lo'
+        });
+        setShowPermissionErrorModal(true);
+        setShowDeleteModal(false);
+      } else {
+        // Outros erros
+        alert('Erro ao deletar evento. Tente novamente.');
+      }
     }
   };
 
@@ -141,27 +159,37 @@ const EventDetails = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    // Converter para fuso horário de Brasília
+    const date = new Date(dateString);
+    const brasiliaTime = new Intl.DateTimeFormat('pt-BR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    }).format(date);
+    
+    return brasiliaTime;
   };
 
   const getEventStatus = (event) => {
     if (!event) return null;
     
+    // Usar fuso horário de Brasília
     const now = new Date();
     const eventDate = new Date(event.date);
     
+    // Converter para fuso horário de Brasília
+    const brasiliaNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    const brasiliaEventDate = new Date(eventDate.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    
     if (!event.isActive) {
       return { status: 'inactive', label: 'Inativo', color: 'text-gray-500', bgColor: 'bg-gray-100' };
-    } else if (eventDate < now) {
+    } else if (brasiliaEventDate < brasiliaNow) {
       return { status: 'finished', label: 'Finalizado', color: 'text-gray-600', bgColor: 'bg-gray-100' };
-    } else if (eventDate.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
+    } else if (brasiliaEventDate.getTime() - brasiliaNow.getTime() < 24 * 60 * 60 * 1000) {
       return { status: 'today', label: 'Hoje', color: 'text-warning-700', bgColor: 'bg-warning-100' };
     } else {
       return { status: 'upcoming', label: 'Próximo', color: 'text-success-700', bgColor: 'bg-success-100' };
@@ -565,6 +593,14 @@ const EventDetails = () => {
               </Link>
               
               <Link
+                to={`/events/${eventId}/palestrantes`}
+                className="btn-outline w-full inline-flex items-center justify-center"
+              >
+                <User className="h-4 w-4 mr-2" />
+                Palestrantes
+              </Link>
+              
+              <Link
                 to={`/events/${eventId}/form-builder`}
                 className="btn-outline w-full inline-flex items-center justify-center"
               >
@@ -774,6 +810,27 @@ const EventDetails = () => {
                     </button>
                   </div>
                 </div>
+                
+                {event?.customSlug && (
+                  <div>
+                    <label className="form-label">Link Personalizado</label>
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={`${window.location.origin}/e/${event.customSlug}`}
+                        readOnly
+                        className="input rounded-r-none"
+                      />
+                      <button
+                        onClick={() => copyToClipboard(`${window.location.origin}/e/${event.customSlug}`)}
+                        className="btn-outline rounded-l-none"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <div>
                   <label className="form-label">Link de Inscrição</label>
                   <div className="flex">
@@ -791,6 +848,27 @@ const EventDetails = () => {
                     </button>
                   </div>
                 </div>
+                
+                {event?.customSlug && (
+                  <div>
+                    <label className="form-label">Link de Inscrição Personalizado</label>
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={`${window.location.origin}/e/${event.customSlug}/formulario`}
+                        readOnly
+                        className="input rounded-r-none"
+                      />
+                      <button
+                        onClick={() => copyToClipboard(`${window.location.origin}/e/${event.customSlug}/formulario`)}
+                        className="btn-outline rounded-l-none"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex justify-center">
                   <button
                     onClick={() => setShowShareModal(false)}
@@ -858,6 +936,64 @@ const EventDetails = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Erro de Permissão */}
+      {showPermissionErrorModal && permissionError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-6 w-full max-w-md">
+            <div className="relative bg-white rounded-lg shadow-xl">
+              {/* Header */}
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-yellow-100 rounded-full mb-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-600" />
+              </div>
+              
+              {/* Content */}
+              <div className="text-center px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Permissão Negada
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Você não tem permissão para excluir o evento <strong>"{permissionError.eventName}"</strong>.
+                </p>
+                
+                {permissionError.eventOwner && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <p className="text-xs text-gray-500 mb-2">Apenas o criador do evento pode excluí-lo:</p>
+                    <div className="flex items-center justify-center space-x-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {permissionError.eventOwner.name}
+                      </span>
+                    </div>
+                    {permissionError.eventOwner.email && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {permissionError.eventOwner.email}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mb-6">
+                  Entre em contato com o criador do evento se precisar que ele seja excluído.
+                </p>
+                
+                {/* Actions */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setShowPermissionErrorModal(false);
+                      setPermissionError(null);
+                    }}
+                    className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                  >
+                    Entendi
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
